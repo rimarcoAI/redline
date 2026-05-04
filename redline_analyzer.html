@@ -242,10 +242,17 @@ tr:hover td{background:var(--surf2)}
   <h2>Análisis de sesión</h2>
   <div class="al ai" id="an-empty">Importa un CSV y pulsa <strong>Procesar sesión</strong>.</div>
   <div id="an-content" style="display:none">
-    <!-- Summary metrics -->
-    <div class="mg" id="metrics-grid"></div>
 
-    <!-- Event type blocks (injected dynamically) -->
+    <!-- 1. Session overview bar -->
+    <div id="sess-overview"></div>
+
+    <!-- 2. KPI cards — one per event type, zone breakdown inside -->
+    <div id="kpi-events" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px"></div>
+
+    <!-- 3. Load KPI bar -->
+    <div id="kpi-load" style="margin-bottom:12px"></div>
+
+    <!-- 4. Detail blocks with charts (collapsible) -->
     <div id="an-block-accelerations"></div>
     <div id="an-block-decelerations"></div>
     <div id="an-block-jumps"></div>
@@ -400,6 +407,7 @@ const MAX_PTS  = 2200;
 // ─── STATE ────────────────────────────────────────────────────────────────────
 const S = {
   raw:null, metrics:null, events:null, summary:null, fs:100,
+  sessionDate:null,            // ISO string — actual date the session was performed
   cfg: deepClone(DEF_CONFIG),
   profiles:{}, activeProf:null, dirHandle:null, charts:{},
 };
@@ -694,6 +702,11 @@ function handleFile(f){
       const miss=REQ_COLS.filter(c=>!Object.keys(rows[0]||{}).includes(c));
       if(miss.length){toast('Faltan columnas: '+miss.join(', '),'e');return}
       S.raw=rows;S.fs=estFs(rows);
+      // Auto-detect session date from first timestamp in CSV
+      try{
+        const d=new Date(rows[0].timestamp);
+        if(!isNaN(d.getTime()))S.sessionDate=d.toISOString();
+      }catch{}
       renderFileInfo(f.name,rows.length,S.fs);
       document.getElementById('btn-proc').disabled=false;
       toast(`Cargado: ${rows.length.toLocaleString()} muestras · ${S.fs} Hz`,'s');
@@ -709,13 +722,19 @@ function estFs(rows){
 }
 
 function renderFileInfo(name,n,fs){
+  const dateVal=S.sessionDate?new Date(S.sessionDate).toISOString().slice(0,16):'';
   document.getElementById('file-info').innerHTML=`
     <div class="card" style="border-color:var(--green)">
-      <div style="display:flex;align-items:center;gap:9px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
         <span style="font-size:20px">✅</span>
         <div><div style="font-weight:600;font-size:12px">${name}</div>
         <div style="font-size:10px;color:var(--mut)">${n.toLocaleString()} muestras · ${fs} Hz · ~${(n/fs/60).toFixed(1)} min</div></div>
       </div>
+      <label class="lbl">📅 Fecha de realización de la sesión</label>
+      <input type="datetime-local" id="sess-date-input" value="${dateVal}"
+             onchange="S.sessionDate=this.value?new Date(this.value).toISOString():null"
+             style="background:var(--surf2);border:1px solid var(--brd);color:var(--txt);border-radius:6px;padding:5px 9px;width:100%;font-size:12px">
+      <p style="font-size:10px;color:var(--mut);margin-top:4px">Detectada automáticamente del CSV. Edítala si es necesario.</p>
     </div>`;
 }
 
@@ -917,25 +936,126 @@ function renderAnalysis(m,ev,su){
   document.getElementById('an-empty').style.display='none';
   document.getElementById('an-content').style.display='';
 
-  // Summary metrics cards
-  const COL={'Duración':'#3b82f6','Player Load':'#22c55e','Load/min':'#22c55e',
-    'Aceleraciones':'#22c55e','Deceleraciones':'#ef4444','Saltos':'#3b82f6','Cambios dir.':'#eab308',
-    'Total eventos':'#a855f7','Acc.máx.':'#f97316','Gyro máx.':'#eab308'};
-  document.getElementById('metrics-grid').innerHTML=
-    Object.entries(su).map(([k,v])=>`
-      <div class="mc" style="border-color:${(COL[k]||'#888')}33">
-        <div class="ml">${k}</div>
-        <div class="mv" style="color:${COL[k]||'var(--txt)'};font-size:${String(v).length>7?'14':'20'}px">${v}</div>
-      </div>`).join('');
+  renderSessionOverview(su,m);
+  renderKPIEvents(ev,m);
+  renderLoadKPI(m,ev);
 
   const{labels,ds}=buildChartData(m);
-
-  // Render one block per event type
-  for(const type of Object.keys(TYPE_META)){
-    renderTypeBlock(type,m,ev,labels,ds);
-  }
-  // Load block
+  for(const type of Object.keys(TYPE_META))renderTypeBlock(type,m,ev,labels,ds);
   renderLoadBlock(m,ev,labels,ds);
+}
+
+/* ── Session overview bar ──────────────────────────────────────────────── */
+function renderSessionOverview(su,m){
+  const sd=S.sessionDate?new Date(S.sessionDate):null;
+  const dateStr=sd?sd.toLocaleDateString('es-ES',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):'Sin fecha';
+  const timeStr=sd?sd.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
+  const dur=su['Duración']||'—',load=su['Player Load']||'—',lmin=su['Load/min']||'—';
+  const accMax=su['Acc.máx.']||'—',gyroMax=su['Gyro máx.']||'—',muestras=su['Muestras']||'—';
+  document.getElementById('sess-overview').innerHTML=`
+    <div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 18px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--brd)">
+        <span style="font-size:18px">🏀</span>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">${S.activeProf||'Sin jugador'}</div>
+          <div style="font-size:11px;color:var(--mut)">${dateStr}${timeStr?' · '+timeStr:''}</div>
+        </div>
+        <div style="font-size:10px;color:var(--mut);text-align:right">${muestras} muestras · ${m.fs} Hz</div>
+      </div>
+      <div style="display:flex;gap:0;flex-wrap:wrap">
+        ${[['DURACIÓN',dur,'#3b82f6'],['PLAYER LOAD',load,'#22c55e'],['LOAD / MIN',lmin,'#22c55e'],
+           ['ACC. MÁX.',accMax,'#f97316'],['GYRO MÁX.',gyroMax,'#eab308']].map(([lbl,val,col],i)=>`
+          <div style="flex:1;min-width:100px;padding:0 16px;${i>0?'border-left:1px solid var(--brd)':''}">
+            <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${lbl}</div>
+            <div style="font-size:18px;font-weight:700;color:${col}">${val}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* ── KPI cards — one per event type with zone breakdown ────────────────── */
+function renderKPIEvents(ev,m){
+  document.getElementById('kpi-events').innerHTML=Object.entries(TYPE_META).map(([type,meta])=>{
+    const evByZone=ev[type]||{};
+    const zones=[...S.cfg[type].zones].sort((a,b)=>a.min-b.min);
+    const total=Object.values(evByZone).reduce((a,arr)=>a+arr.length,0);
+    const maxCnt=Math.max(...zones.map(z=>(evByZone[z.name]||[]).length),1);
+
+    const bars=zones.map(z=>{
+      const evs=evByZone[z.name]||[];
+      const cnt=evs.length;
+      const pct=Math.round(cnt/maxCnt*100);
+      const avgDur=cnt?(evs.reduce((a,e)=>a+e.duracion_s,0)/cnt).toFixed(1)+'s':'—';
+      const pk=cnt?Math.max(...evs.map(e=>e.pico)).toFixed(2)+' '+meta.unit:'—';
+      return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <div style="width:7px;height:7px;border-radius:50%;background:${z.color};flex-shrink:0"></div>
+        <span style="font-size:10px;color:${z.color};font-weight:700;min-width:46px">${z.name}</span>
+        <div style="flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${z.color};border-radius:2px"></div>
+        </div>
+        <span style="font-size:12px;font-weight:700;color:${z.color};min-width:20px;text-align:right">${cnt}</span>
+        <span style="font-size:9px;color:var(--mut);min-width:110px">${cnt?`${avgDur} · pk ${pk}`:''}</span>
+      </div>`;
+    }).join('');
+
+    return`<div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <span style="font-size:15px">${meta.icon}</span>
+        <span style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px">${meta.label}</span>
+      </div>
+      <div style="font-size:38px;font-weight:700;line-height:1">${total}</div>
+      <div style="font-size:9px;color:var(--mut);margin-bottom:10px;margin-top:1px">eventos totales</div>
+      <div style="border-top:1px solid var(--brd);padding-top:8px">${bars}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Load KPI bar ──────────────────────────────────────────────────────── */
+function renderLoadKPI(m,ev){
+  const lc=S.cfg.load;
+  const zones=[...lc.zones||[]].sort((a,b)=>a.min-b.min);
+  const loadZones=ev.load_zones||{};
+  const totalTime=m.time_s[m.n-1];
+  const totalLoad=m.load_cum[m.n-1];
+  const maxZT=Math.max(...zones.map(z=>(loadZones[z.name]?.time_s||0)),1);
+
+  const bars=zones.map(z=>{
+    const zt=loadZones[z.name]||{time_s:0};
+    const pct=Math.round(zt.time_s/maxZT*100);
+    const tpct=(zt.time_s/totalTime*100).toFixed(1);
+    return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+      <div style="width:7px;height:7px;border-radius:50%;background:${z.color};flex-shrink:0"></div>
+      <span style="font-size:10px;color:${z.color};font-weight:700;min-width:46px">${z.name}</span>
+      <div style="flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${z.color};border-radius:2px"></div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:${z.color};min-width:32px;text-align:right">${zt.time_s.toFixed(0)}s</span>
+      <span style="font-size:9px;color:var(--mut);min-width:44px">${tpct}% sesión</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('kpi-load').innerHTML=`
+    <div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:15px">⚡</span>
+        <span style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px">Player Load</span>
+        <span style="font-size:10px;color:var(--mut);margin-left:auto;background:var(--surf2);padding:2px 7px;border-radius:4px">${lc.preset}</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:24px">
+        <div style="min-width:90px">
+          <div style="font-size:32px;font-weight:700;color:#22c55e;line-height:1">${totalLoad.toFixed(1)}</div>
+          <div style="font-size:9px;color:var(--mut);margin-top:2px">TOTAL</div>
+        </div>
+        <div style="min-width:70px;border-left:1px solid var(--brd);padding-left:20px">
+          <div style="font-size:22px;font-weight:700;color:#22c55e;line-height:1">${(totalLoad/(totalTime/60)).toFixed(2)}</div>
+          <div style="font-size:9px;color:var(--mut);margin-top:2px">POR MINUTO</div>
+        </div>
+        <div style="flex:1;border-left:1px solid var(--brd);padding-left:20px">
+          <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Tiempo por zona de intensidad</div>
+          ${bars}
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderTypeBlock(type,m,ev,labels,ds){
@@ -1222,10 +1342,18 @@ function renderEvTbl(){
 function toCSV(rows,cols){return cols.join(',')+'\n'+rows.map(r=>cols.map(c=>{const v=r[c]??'';return String(v).includes(',')?`"${v}"`:v}).join(',')).join('\n')}
 function dlBlob(content,name,mime='text/csv'){const b=new Blob([content],{type:mime});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function dStr(d=new Date()){return d.toISOString().slice(0,19).replace(/[T:]/g,'-')}
-function dlEvents(){const all=allEventsFlat();if(!all.length){toast('Sin eventos','e');return}dlBlob(toCSV(all,['tipo','zona','inicio_s','fin_s','duracion_s','pico','media']),`eventos_${dStr()}.csv`);toast('Exportado','s')}
-function dlSummary(){if(!S.summary)return;dlBlob(toCSV(Object.entries(S.summary).map(([k,v])=>({metrica:k,valor:v})),['metrica','valor']),`resumen_${dStr()}.csv`);toast('Exportado','s')}
-function sessData(){return{id:Date.now(),date:new Date().toISOString(),player:S.activeProf||'SinPerfil',fs:S.fs,config:deepClone(S.cfg),summary:S.summary,events:S.events}}
-function dlJSON(){dlBlob(JSON.stringify(sessData(),null,2),`sesion_${dStr()}.json`,'application/json');toast('JSON exportado','s')}
+function sessData(){
+  const sd=S.sessionDate||new Date().toISOString();
+  return{id:Date.now(),date:new Date().toISOString(),sessionDate:sd,
+    player:S.activeProf||'SinPerfil',fs:S.fs,config:deepClone(S.cfg),summary:S.summary,events:S.events}
+}
+function sessDateLabel(){
+  const d=S.sessionDate?new Date(S.sessionDate):new Date();
+  return`${S.activeProf||'sesion'}_${dStr(d)}`;
+}
+function dlEvents(){const all=allEventsFlat();if(!all.length){toast('Sin eventos','e');return}dlBlob(toCSV(all,['tipo','zona','inicio_s','fin_s','duracion_s','pico','media']),`eventos_${sessDateLabel()}.csv`);toast('Exportado','s')}
+function dlSummary(){if(!S.summary)return;dlBlob(toCSV(Object.entries(S.summary).map(([k,v])=>({metrica:k,valor:v})),['metrica','valor']),`resumen_${sessDateLabel()}.csv`);toast('Exportado','s')}
+function dlJSON(){dlBlob(JSON.stringify(sessData(),null,2),`sesion_${sessDateLabel()}.json`,'application/json');toast('JSON exportado','s')}
 
 // ═══════════════════════════════════════════════════════
 // FILE SYSTEM ACCESS API
@@ -1243,10 +1371,13 @@ async function autoSave(){
   try{const perm=await S.dirHandle.requestPermission({mode:'readwrite'});if(perm!=='granted')return;
     const pname=(S.activeProf||'SinPerfil').replace(/[^a-zA-Z0-9_-]/g,'_');
     const pd=await S.dirHandle.getDirectoryHandle(pname,{create:true});
-    const ds_=dStr();const all=allEventsFlat();
+    // Use actual session date for filenames
+    const sessD=S.sessionDate?new Date(S.sessionDate):new Date();
+    const ds_=dStr(sessD);
+    const all=allEventsFlat();
     if(all.length)await writeFile(pd,`${ds_}_eventos.csv`,toCSV(all,['tipo','zona','inicio_s','fin_s','duracion_s','pico','media']));
     await writeFile(pd,`${ds_}_sesion.json`,JSON.stringify(sessData(),null,2));
-    toast(`Guardado en ${pname}/`,'s');
+    toast(`Guardado en ${pname}/${ds_}`,'s');
   }catch(e){if(e.name!=='AbortError')console.warn('autoSave:',e.message)}
 }
 
@@ -1255,18 +1386,33 @@ async function autoSave(){
 // ═══════════════════════════════════════════════════════
 async function saveToHist(){if(!S.summary){toast('Nada que guardar','e');return}try{await dbPut('sessions',sessData());toast('Guardado','s');renderHist()}catch(e){toast('Error: '+e.message,'e')}}
 async function renderHist(){
-  const all=await dbAll('sessions');all.sort((a,b)=>new Date(b.date)-new Date(a.date));
-  document.getElementById('hist-count').textContent=`${all.length} sesiones`;
+  const all=await dbAll('sessions');
+  // Sort by session date (when the session happened), newest first
+  all.sort((a,b)=>new Date(b.sessionDate||b.date)-new Date(a.sessionDate||a.date));
+  document.getElementById('hist-count').textContent=`${all.length} sesión${all.length!==1?'es':''}`;
   const el=document.getElementById('hist-list');
-  if(!all.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin sesiones.</p>';return}
+  if(!all.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin sesiones guardadas.</p>';return}
   el.innerHTML=all.map(s=>{
-    const d=new Date(s.date);
+    const sd=new Date(s.sessionDate||s.date);
+    const savedAt=new Date(s.date);
+    const sessStr=sd.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})
+                  +' '+sd.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const savedStr=savedAt.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'})
+                   +' '+savedAt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const evTot=s.summary?.['Total eventos']??'—';
+    const load=s.summary?.['Player Load']??'—';
+    const dur=s.summary?.['Duración']??'—';
     return`<div class="sc">
-      <span style="font-size:24px">🏀</span>
+      <div style="background:var(--acc);border-radius:8px;padding:8px 10px;text-align:center;min-width:50px">
+        <div style="font-size:18px;font-weight:700;color:#fff;line-height:1">${sd.getDate().toString().padStart(2,'0')}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.8);text-transform:uppercase">${sd.toLocaleString('es-ES',{month:'short'})}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.8)">${sd.getFullYear()}</div>
+      </div>
       <div style="flex:1">
-        <div style="font-weight:600;font-size:12px">${s.player}</div>
-        <div style="font-size:10px;color:var(--mut)">${d.toLocaleDateString('es-ES')} ${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</div>
-        <div style="font-size:10px;color:var(--mut);margin-top:2px">${s.summary?.['Duración']||'—'} · ${s.summary?.['Total eventos']||'—'} eventos · Load: ${s.summary?.['Player Load']||'—'}</div>
+        <div style="font-weight:700;font-size:13px">${s.player}</div>
+        <div style="font-size:11px;color:var(--txt)">${sessStr}</div>
+        <div style="font-size:10px;color:var(--mut);margin-top:3px">${dur} · ${evTot} eventos · Load: ${load}</div>
+        <div style="font-size:9px;color:var(--mut);margin-top:1px">Guardado: ${savedStr}</div>
       </div>
       <div style="display:flex;gap:5px">
         <button class="btn bs" style="padding:4px 8px;font-size:10px" onclick="dlHistSess(${s.id})">⬇</button>
@@ -1275,7 +1421,11 @@ async function renderHist(){
     </div>`;
   }).join('');
 }
-async function dlHistSess(id){const s=await dbGet('sessions',id);if(!s)return;dlBlob(JSON.stringify(s,null,2),`sesion_${s.player}_${dStr(new Date(s.date))}.json`,'application/json')}
+async function dlHistSess(id){
+  const s=await dbGet('sessions',id);if(!s)return;
+  const sd=new Date(s.sessionDate||s.date);
+  dlBlob(JSON.stringify(s,null,2),`sesion_${s.player}_${dStr(sd)}.json`,'application/json');
+}
 async function delHist(id){if(!confirm('¿Eliminar?'))return;await dbDel('sessions',id);renderHist();toast('Eliminada','s')}
 async function clearHist(){if(!confirm('¿Borrar todo?'))return;await dbClr('sessions');renderHist();toast('Borrado','s')}
 
