@@ -148,6 +148,26 @@ tr:hover td{background:var(--surf2)}
 #toast.on{opacity:1}
 
 @media(max-width:760px){nav{width:48px;min-width:48px}.nb span:last-child,.logo p,.logo h1,.nav-ft{display:none}.g2,.g3{grid-template-columns:1fr}main{padding:12px}}
+
+/* WELLNESS RATING BUTTONS */
+.wr{display:flex;gap:4px;flex-wrap:wrap}
+.wr-btn{padding:4px 9px;border:1px solid var(--brd);border-radius:4px;background:var(--surf2);color:var(--mut);cursor:pointer;font-size:12px;transition:.15s}
+.wr-btn:hover{border-color:var(--acc)}.wr-btn.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--brd);margin-bottom:16px;overflow-x:auto}
+.tab{padding:8px 14px;cursor:pointer;font-size:12px;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;white-space:nowrap}
+.tab:hover{color:var(--txt)}.tab.on{color:var(--acc);border-bottom-color:var(--acc)}
+.tab-content{display:none}.tab-content.on{display:block}
+
+/* INJURY BADGE COLORS */
+.inj-ok{background:rgba(34,197,94,.15);color:#22c55e}
+.inj-watch{background:rgba(234,179,8,.15);color:#eab308}
+.inj-out{background:rgba(239,68,68,.15);color:#ef4444}
+
+/* PLAYER ROSTER ITEM */
+.player-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:6px;cursor:pointer;transition:.15s;margin-bottom:3px}
+.player-item:hover,.player-item.sel{background:var(--surf2)}
 </style>
 </head>
 <body>
@@ -160,6 +180,8 @@ tr:hover td{background:var(--surf2)}
   <button class="nb"    onclick="pg('events')"     id="n-events">    <span class="ic">🏷️</span><span>Eventos</span></button>
   <button class="nb"    onclick="pg('history')"    id="n-history">   <span class="ic">🗂️</span><span>Historial</span></button>
   <button class="nb"    onclick="pg('export')"     id="n-export">    <span class="ic">💾</span><span>Exportar</span></button>
+  <button class="nb"    onclick="pg('equipo')"     id="n-equipo">    <span class="ic">👥</span><span>Equipo</span></button>
+  <button class="nb"    onclick="pg('metricas')"   id="n-metricas">  <span class="ic">📊</span><span>Métricas</span></button>
   <div class="nav-ft" id="nav-folder">📁 Sin carpeta</div>
 </nav>
 
@@ -330,6 +352,150 @@ tr:hover td{background:var(--surf2)}
   </div>
 </div>
 
+<!-- ═══ EQUIPO ═══ -->
+<div class="page" id="page-equipo">
+  <h2>Equipo</h2>
+  <div style="display:flex;gap:14px;align-items:flex-start">
+    <div style="min-width:190px;max-width:210px">
+      <div class="card">
+        <div class="sh">Jugadores</div>
+        <div id="equipo-roster"><p style="color:var(--mut);font-size:11px">Sin jugadores.</p></div>
+      </div>
+    </div>
+    <div style="flex:1" id="equipo-content">
+      <div id="equipo-team-view"><p style="color:var(--mut);font-size:11px">Selecciona un jugador o crea perfiles primero.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MÉTRICAS ═══ -->
+<div class="page" id="page-metricas">
+  <h2>Métricas</h2>
+  <div class="card" style="padding:9px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:11px;color:var(--mut)">Jugador:</span>
+    <select id="metricas-player" onchange="onMetricasPlayer()" style="width:200px"></select>
+  </div>
+  <div class="tabs">
+    <div class="tab on"  onclick="metTab('entrenamiento',this)">📋 Entrenamiento</div>
+    <div class="tab"     onclick="metTab('bienestar',this)">💚 Bienestar</div>
+    <div class="tab"     onclick="metTab('lesiones',this)">🩺 Lesiones</div>
+    <div class="tab"     onclick="metTab('feb',this)">🏀 FEB Stats</div>
+    <div class="tab"     onclick="metTab('mcp',this)">🔗 MCP</div>
+  </div>
+
+  <!-- Entrenamiento -->
+  <div class="tab-content on" id="mt-entrenamiento">
+    <div class="g2">
+      <div class="card">
+        <div class="sh">Registrar sesión de entrenamiento</div>
+        <label class="lbl">Fecha</label><input type="date" id="tr-date">
+        <label class="lbl">Tipo</label>
+        <select id="tr-type"><option value="field" selected>🏀 Pista</option><option value="gym">🏋️ Gimnasio</option><option value="match">🏆 Partido</option><option value="other">📝 Otro</option></select>
+        <label class="lbl">Tiempo efectivo (min)</label>
+        <input type="number" id="tr-time" value="60" min="1" max="300" oninput="updateSrpe()">
+        <label class="lbl">Coeficiente de intensidad (0.5–2.0)</label>
+        <input type="number" id="tr-coeff" value="1.0" min="0.1" max="3" step="0.1" oninput="updateSrpe()">
+        <label class="lbl" style="margin-top:10px">RPE (0–10)</label>
+        <div class="wr" id="tr-rpe-btns"></div>
+        <div style="margin-top:9px;padding:9px 12px;background:var(--surf2);border-radius:6px;font-size:12px">
+          sRPE = RPE × tiempo × coef. = <span id="tr-srpe" style="color:var(--acc);font-weight:700;font-size:15px">300</span> <span style="color:var(--mut)">u.a.</span>
+        </div>
+        <label class="lbl">Notas</label><input id="tr-notes" placeholder="Opcional">
+        <button class="btn bp bw" style="margin-top:12px" onclick="saveTraining()">💾 Guardar entrenamiento</button>
+      </div>
+      <div class="card">
+        <div class="sh">Historial</div>
+        <div id="tr-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bienestar -->
+  <div class="tab-content" id="mt-bienestar">
+    <div class="g2">
+      <div class="card">
+        <div class="sh">Test de bienestar</div>
+        <label class="lbl">Fecha</label><input type="date" id="well-date">
+        <label class="lbl" style="margin-top:10px">Calidad del sueño</label><div class="wr" id="wr-sleep"></div>
+        <label class="lbl" style="margin-top:8px">Fatiga</label><div class="wr" id="wr-fatigue"></div>
+        <label class="lbl" style="margin-top:8px">Dolor muscular</label><div class="wr" id="wr-soreness"></div>
+        <label class="lbl" style="margin-top:8px">Nivel de estrés</label><div class="wr" id="wr-stress"></div>
+        <label class="lbl" style="margin-top:8px">Estado de ánimo</label><div class="wr" id="wr-mood"></div>
+        <div style="margin-top:10px;padding:9px 12px;background:var(--surf2);border-radius:6px;font-size:12px">
+          Total bienestar: <span id="well-total" style="color:var(--acc);font-weight:700;font-size:15px">—</span> <span style="color:var(--mut)">/ 25</span>
+        </div>
+        <button class="btn bp bw" style="margin-top:12px" onclick="saveWellness()">💾 Guardar bienestar</button>
+      </div>
+      <div class="card">
+        <div class="sh">Historial</div>
+        <div id="well-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lesiones -->
+  <div class="tab-content" id="mt-lesiones">
+    <div class="g2">
+      <div class="card">
+        <div class="sh">Registro de molestia / lesión</div>
+        <label class="lbl">Fecha de inicio</label><input type="date" id="inj-date">
+        <label class="lbl">Localización</label><input id="inj-location" placeholder="Ej. Tobillo derecho, Rodilla izq...">
+        <label class="lbl">Estado</label>
+        <select id="inj-status">
+          <option value="ok">✅ Sin molestia</option>
+          <option value="watch">⚠️ Seguimiento</option>
+          <option value="out">🚫 Baja</option>
+        </select>
+        <label class="lbl">Notas</label><input id="inj-notes" placeholder="Descripción, tipo, tratamiento...">
+        <button class="btn bp bw" style="margin-top:12px" onclick="saveInjury()">💾 Guardar</button>
+      </div>
+      <div class="card">
+        <div class="sh">Historial de lesiones</div>
+        <div id="inj-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEB Stats -->
+  <div class="tab-content" id="mt-feb">
+    <div class="card">
+      <div class="sh">🏀 FEB Baloncesto en Vivo — Estadísticas</div>
+      <p style="font-size:11px;color:var(--mut);margin-bottom:10px">Introduce la URL del último partido en FEB Baloncesto en Vivo para importar estadísticas automáticamente.</p>
+      <div style="display:flex;gap:7px;margin-bottom:10px">
+        <input id="feb-url" placeholder="https://baloncestoenVivo.feb.es/..." style="flex:1">
+        <button class="btn bp" onclick="fetchFEB()">Obtener</button>
+      </div>
+      <div id="feb-status"></div>
+      <div id="feb-table"></div>
+    </div>
+  </div>
+
+  <!-- MCP -->
+  <div class="tab-content" id="mt-mcp">
+    <div class="card">
+      <div class="sh">🔗 Integración MCP myalbatross.ai</div>
+      <p style="font-size:11px;color:var(--mut);margin-bottom:10px">Configura el endpoint y token para enviar datos al servidor MCP.</p>
+      <label class="lbl">Endpoint URL</label>
+      <input id="mcp-url" placeholder="https://api.myalbatross.ai/ingest">
+      <label class="lbl">API Token</label>
+      <input id="mcp-token" type="password" placeholder="Bearer token...">
+      <div class="sh" style="margin-top:14px">Datos a enviar</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12px">
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-imu" checked style="width:auto"> Sesiones IMU</label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-training" checked style="width:auto"> Diario de entrenamiento</label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-wellness" checked style="width:auto"> Test de bienestar</label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-injuries" checked style="width:auto"> Lesiones</label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-game" checked style="width:auto"> Estadísticas de partido</label>
+      </div>
+      <div style="display:flex;gap:7px">
+        <button class="btn bp" style="flex:1" onclick="mcpSave()">💾 Guardar config.</button>
+        <button class="btn bs" style="flex:1" onclick="mcpPush()">🚀 Enviar datos</button>
+      </div>
+      <div id="mcp-status" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
 </main>
 
 <!-- MODAL: New Profile -->
@@ -420,11 +586,15 @@ function deepClone(o){return JSON.parse(JSON.stringify(o))}
 let db;
 function openDB(){
   return new Promise((res,rej)=>{
-    const r=indexedDB.open('RedlineIMU',3);
+    const r=indexedDB.open('RedlineIMU',4);
     r.onupgradeneeded=e=>{
       const d=e.target.result;
       if(!d.objectStoreNames.contains('sessions')){const s=d.createObjectStore('sessions',{keyPath:'id',autoIncrement:true});s.createIndex('date','date')}
       if(!d.objectStoreNames.contains('cfg'))d.createObjectStore('cfg',{keyPath:'k'});
+      if(!d.objectStoreNames.contains('training'))d.createObjectStore('training',{keyPath:'id',autoIncrement:true});
+      if(!d.objectStoreNames.contains('wellness'))d.createObjectStore('wellness',{keyPath:'id',autoIncrement:true});
+      if(!d.objectStoreNames.contains('injuries'))d.createObjectStore('injuries',{keyPath:'id',autoIncrement:true});
+      if(!d.objectStoreNames.contains('game_stats'))d.createObjectStore('game_stats',{keyPath:'id',autoIncrement:true});
     };
     r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=rej;
   });
@@ -1414,7 +1584,8 @@ async function renderHist(){
         <div style="font-size:10px;color:var(--mut);margin-top:3px">${dur} · ${evTot} eventos · Load: ${load}</div>
         <div style="font-size:9px;color:var(--mut);margin-top:1px">Guardado: ${savedStr}</div>
       </div>
-      <div style="display:flex;gap:5px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button class="btn bp" style="padding:4px 8px;font-size:10px" onclick="viewStoredSession_hist(${s.id})">👁 Ver</button>
         <button class="btn bs" style="padding:4px 8px;font-size:10px" onclick="dlHistSess(${s.id})">⬇</button>
         <button class="btn bd" style="padding:4px 8px;font-size:10px" onclick="delHist(${s.id})">✕</button>
       </div>
@@ -1429,6 +1600,96 @@ async function dlHistSess(id){
 async function delHist(id){if(!confirm('¿Eliminar?'))return;await dbDel('sessions',id);renderHist();toast('Eliminada','s')}
 async function clearHist(){if(!confirm('¿Borrar todo?'))return;await dbClr('sessions');renderHist();toast('Borrado','s')}
 
+async function viewStoredSession_hist(id){
+  const s=await dbGet('sessions',id);
+  if(!s){toast('No encontrada','e');return}
+  renderHistoricalAnalysis(s);
+}
+
+function renderHistoricalAnalysis(s){
+  S.activeProf=s.player;
+  S.sessionDate=s.sessionDate||s.date;
+  S.events=s.events||{};
+  S.summary=s.summary||{};
+  if(s.config)S.cfg=deepClone(s.config);
+
+  const su=S.summary,ev=S.events;
+
+  // Parse duration and load from stored summary strings
+  const durMatch=String(su['Duración']||'0s').match(/(\d+(?:\.\d+)?)/);
+  const durS=durMatch?parseFloat(durMatch[1]):0;
+  const totalLoad=parseFloat(String(su['Player Load']||'0').replace(',','.'))||0;
+  const nSamples=Math.max(parseInt(String(su['Muestras']||'1').replace(/[^0-9]/g,''))||1,1);
+
+  // Minimal fake metrics object for render functions that only need fs, n, time_s[n-1], load_cum[n-1]
+  const fakeTimeS=new Float64Array(nSamples);fakeTimeS[nSamples-1]=durS;
+  const fakeLoadCum=new Float64Array(nSamples);fakeLoadCum[nSamples-1]=totalLoad;
+  const fakeM={fs:s.fs||100,n:nSamples,time_s:fakeTimeS,load_cum:fakeLoadCum};
+
+  document.getElementById('an-empty').style.display='none';
+  document.getElementById('an-content').style.display='';
+
+  renderSessionOverview(su,fakeM);
+  const ov=document.getElementById('sess-overview');
+  ov.innerHTML='<div class="al aw" style="margin-bottom:8px">📂 Modo histórico — gráficos no disponibles. Reimporta el CSV para análisis completo.</div>'+ov.innerHTML;
+
+  renderKPIEvents(ev,fakeM);
+  renderLoadKPI(fakeM,ev);
+
+  // Static detail blocks (no charts)
+  for(const type of Object.keys(TYPE_META)){
+    const meta=TYPE_META[type];
+    const evByZone=ev[type]||{};
+    const zones=(S.cfg[type]?.zones)||[];
+    const total=Object.values(evByZone).reduce((a,arr)=>a+arr.length,0);
+    const pills=zones.map(z=>{const cnt=(evByZone[z.name]||[]).length;return`<span class="zp" style="background:${z.color}28;color:${z.color}">${z.name}: ${cnt}</span>`}).join('');
+    document.getElementById('an-block-'+type).innerHTML=`
+      <div class="an-block">
+        <div class="an-hdr" onclick="toggleBlock('an-block-${type}')">
+          <div class="an-hdr-left">
+            <span style="font-size:16px">${meta.icon}</span>
+            <span class="an-title">${meta.label}</span>
+            <span class="an-total">${total} eventos</span>
+          </div>
+          <div class="zone-pills">${pills}</div>
+          <span class="an-chevron open" id="chv-an-block-${type}">▼</span>
+        </div>
+        <div class="an-body open" id="body-an-block-${type}">
+          ${renderZoneBars(evByZone,zones,total,meta.unit)}
+          <div style="text-align:center;padding:18px;color:var(--mut);font-size:11px">📊 Gráfico no disponible en modo histórico</div>
+        </div>
+      </div>`;
+  }
+
+  // Static load block
+  const lc=S.cfg.load||{};const lzones=lc.zones||[];const loadZones=ev.load_zones||{};
+  const maxZ=Math.max(...lzones.map(z=>(loadZones[z.name]?.time_s||0)),1);
+  const totalTime=durS||1;
+  const lpills=lzones.map(z=>{const zt=loadZones[z.name];const pct=zt?(zt.time_s/totalTime*100).toFixed(0):0;return`<span class="zp" style="background:${z.color}28;color:${z.color}">${z.name}: ${pct}%</span>`}).join('');
+  document.getElementById('an-block-load').innerHTML=`
+    <div class="an-block">
+      <div class="an-hdr" onclick="toggleBlock('an-block-load')">
+        <div class="an-hdr-left">
+          <span style="font-size:16px">⚡</span>
+          <span class="an-title">Player Load</span>
+          <span class="an-total">Total: ${totalLoad.toFixed(2)} · ${(totalLoad/(totalTime/60)).toFixed(2)}/min</span>
+        </div>
+        <div class="zone-pills">${lpills}</div>
+        <span class="an-chevron open" id="chv-an-block-load">▼</span>
+      </div>
+      <div class="an-body open" id="body-an-block-load">
+        <div class="zbar-wrap">
+          ${lzones.map(z=>{const zt=loadZones[z.name]||{time_s:0};const pct=Math.round(zt.time_s/maxZ*100);const tpct=(zt.time_s/totalTime*100).toFixed(1);return`<div class="zbar-row"><span class="zbar-label" style="color:${z.color}">${z.name}</span><div class="zbar-track"><div class="zbar-fill" style="width:${pct}%;background:${z.color}"></div></div><span class="zbar-count" style="color:${z.color}">${zt.time_s.toFixed(0)}s</span><span class="zbar-stats">· ${tpct}% del tiempo</span></div>`}).join('')}
+        </div>
+        <div style="text-align:center;padding:18px;color:var(--mut);font-size:11px">📊 Gráfico no disponible en modo histórico</div>
+      </div>
+    </div>`;
+
+  renderEvTbl();
+  pg('analysis');
+  toast('Sesión histórica cargada','s');
+}
+
 // ═══════════════════════════════════════════════════════
 // UI UTILS
 // ═══════════════════════════════════════════════════════
@@ -1436,8 +1697,10 @@ function pg(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   document.getElementById('page-'+name).classList.add('on');
-  document.getElementById('n-'+name).classList.add('on');
+  const nb=document.getElementById('n-'+name);if(nb)nb.classList.add('on');
   if(name==='history')renderHist();
+  if(name==='equipo')renderEquipo();
+  if(name==='metricas')renderMetricas();
 }
 function showMo(id){document.getElementById(id).classList.add('on')}
 function hideMo(id){document.getElementById(id).classList.remove('on')}
@@ -1447,6 +1710,421 @@ function toast(msg,type='s'){
   el.style.background=type==='s'?'#166534':type==='e'?'#7f1d1d':'#713f12';
   el.style.color=type==='s'?'#86efac':type==='e'?'#fca5a5':'#fde047';
   el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),3000);
+}
+
+// ═══════════════════════════════════════════════════════
+// EQUIPO
+// ═══════════════════════════════════════════════════════
+async function renderEquipo(){
+  const sessions=await dbAll('sessions');
+  const profNames=Object.keys(S.profiles);
+  const sessPlayers=[...new Set(sessions.map(s=>s.player))];
+  const allPlayers=[...new Set([...profNames,...sessPlayers])].sort();
+
+  const rosterEl=document.getElementById('equipo-roster');
+  if(!allPlayers.length){rosterEl.innerHTML='<p style="color:var(--mut);font-size:11px">Sin jugadores.</p>';document.getElementById('equipo-team-view').innerHTML='';return}
+
+  rosterEl.innerHTML=`
+    <div class="player-item sel" onclick="renderTeamDash()">
+      <span style="font-size:14px">👥</span>
+      <span style="font-size:12px;font-weight:600">Vista equipo</span>
+    </div>`+
+    allPlayers.map(name=>{
+      const p=S.profiles[name];
+      return`<div class="player-item" onclick="viewPlayerDash('${name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+        <div class="av" style="width:26px;height:26px;font-size:10px;flex-shrink:0">${name[0].toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+          ${p?`<div style="font-size:9px;color:var(--mut)">${p.posicion||''}</div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+  renderTeamDash(allPlayers,sessions);
+}
+
+async function renderTeamDash(allPlayers,sessions){
+  if(!sessions)sessions=await dbAll('sessions');
+  if(!allPlayers){
+    const profs=Object.keys(S.profiles);
+    const sPlayers=[...new Set(sessions.map(s=>s.player))];
+    allPlayers=[...new Set([...profs,...sPlayers])].sort();
+  }
+  const injuries=await dbAll('injuries');
+  const rows=allPlayers.map(player=>{
+    const pSess=sessions.filter(s=>s.player===player);
+    const p=S.profiles[player]||{};
+    const lastInj=injuries.filter(i=>i.player===player).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(!pSess.length)return{player,posicion:p.posicion||'—',sessions:0,avgLoad:'—',lastDate:'—',injStatus:lastInj?.status||null};
+    const sorted=pSess.sort((a,b)=>new Date(b.sessionDate||b.date)-new Date(a.sessionDate||a.date));
+    const avgLoad=(pSess.reduce((a,s)=>a+parseFloat(s.summary?.['Player Load']||0),0)/pSess.length).toFixed(1);
+    const lastDate=new Date(sorted[0].sessionDate||sorted[0].date).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    return{player,posicion:p.posicion||'—',sessions:pSess.length,avgLoad,lastDate,injStatus:lastInj?.status||null};
+  });
+
+  const injBadge=s=>s?`<span class="badge ${s==='ok'?'inj-ok':s==='watch'?'inj-watch':'inj-out'}" style="font-size:9px">${s==='ok'?'OK':s==='watch'?'⚠️':'🚫'}</span>`:'';
+
+  document.getElementById('equipo-team-view').innerHTML=`
+    <div class="card">
+      <div class="sh" style="margin-bottom:10px">Dashboard equipo — ${allPlayers.length} jugadores</div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Jugador</th><th>Posición</th><th>Sesiones</th><th>Load medio</th><th>Última sesión</th><th>Estado</th><th></th></tr></thead>
+          <tbody>${rows.map(r=>`<tr>
+            <td><div style="display:flex;align-items:center;gap:6px">
+              <div class="av" style="width:22px;height:22px;font-size:10px;flex-shrink:0">${r.player[0].toUpperCase()}</div>
+              <span style="font-weight:600">${r.player}</span>
+            </div></td>
+            <td style="color:var(--mut)">${r.posicion}</td>
+            <td style="font-weight:700">${r.sessions}</td>
+            <td style="color:var(--green);font-weight:700">${r.avgLoad}</td>
+            <td style="color:var(--mut)">${r.lastDate}</td>
+            <td>${injBadge(r.injStatus)}</td>
+            <td><button class="btn bs" style="padding:2px 8px;font-size:10px" onclick="viewPlayerDash('${r.player.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">Ver →</button></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function viewPlayerDash(player){
+  const sessions=(await dbAll('sessions')).filter(s=>s.player===player).sort((a,b)=>new Date(b.sessionDate||b.date)-new Date(a.sessionDate||a.date));
+  const training=(await dbAll('training')).filter(t=>t.player===player).sort((a,b)=>b.date.localeCompare(a.date));
+  const wellness=(await dbAll('wellness')).filter(w=>w.player===player).sort((a,b)=>b.date.localeCompare(a.date));
+  const injuries=(await dbAll('injuries')).filter(i=>i.player===player).sort((a,b)=>b.date.localeCompare(a.date));
+  const p=S.profiles[player]||{};
+  const lastInj=injuries[0];
+  const avgLoad=sessions.length?(sessions.reduce((a,s)=>a+parseFloat(s.summary?.['Player Load']||0),0)/sessions.length).toFixed(1):'—';
+  const wellTotal=wellness.length?(wellness[0].sleep+wellness[0].fatigue+wellness[0].soreness+wellness[0].stress+wellness[0].mood):null;
+  const avgSrpe=training.length?(training.reduce((a,t)=>a+(t.srpe||0),0)/training.length).toFixed(0):'—';
+  const TYPE_LBL={gym:'Gimnasio',field:'Pista',match:'Partido',other:'Otro'};
+
+  document.getElementById('equipo-team-view').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button class="btn bs" onclick="renderEquipo()" style="padding:4px 9px;font-size:11px">← Equipo</button>
+      <div class="av" style="width:36px;height:36px;font-size:14px">${player[0].toUpperCase()}</div>
+      <div>
+        <div style="font-size:16px;font-weight:700">${player}</div>
+        <div style="font-size:11px;color:var(--mut)">${p.posicion||''} · ${p.peso||'—'} kg${p.notas?' · '+p.notas:''}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+      ${[['Sesiones IMU',sessions.length,'#3b82f6'],['Load medio',avgLoad,'#22c55e'],['Bienestar',wellTotal!==null?wellTotal+'/25':'—','#a855f7'],['sRPE medio',avgSrpe,'#f97316']].map(([l,v,c])=>`<div class="mc"><div class="ml">${l}</div><div class="mv" style="color:${c}">${v}</div></div>`).join('')}
+    </div>
+    <div class="g2">
+      <div>
+        <div class="card">
+          <div class="sh">Sesiones IMU (${sessions.length})</div>
+          ${sessions.length?sessions.slice(0,10).map(s=>{const sd=new Date(s.sessionDate||s.date);return`<div class="sc" style="padding:8px 10px;cursor:pointer;margin-bottom:4px" onclick="viewStoredSession_hist(${s.id})">
+            <div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:700">${sd.getDate()}</div><div style="font-size:9px;color:var(--mut)">${sd.toLocaleString('es-ES',{month:'short'})}</div></div>
+            <div style="flex:1"><div style="font-size:11px;font-weight:600">${s.summary?.['Duración']||'—'}</div><div style="font-size:10px;color:var(--mut)">Load: ${s.summary?.['Player Load']||'—'} · ${s.summary?.['Total eventos']||'—'} eventos</div></div>
+            <span style="font-size:10px;color:var(--acc)">👁</span>
+          </div>`}).join(''):'<p style="color:var(--mut);font-size:11px">Sin sesiones.</p>'}
+        </div>
+        <div class="card">
+          <div class="sh">Lesiones (${injuries.length})</div>
+          ${injuries.length?injuries.map(i=>`<div class="sc" style="padding:7px 10px;margin-bottom:4px">
+            <span class="badge ${i.status==='ok'?'inj-ok':i.status==='watch'?'inj-watch':'inj-out'}">${i.status==='ok'?'OK':i.status==='watch'?'Seguimiento':'Baja'}</span>
+            <div style="flex:1"><div style="font-size:11px;font-weight:600">${i.location}</div><div style="font-size:10px;color:var(--mut)">${i.date}${i.notes?' · '+i.notes:''}</div></div>
+            <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delInjury(${i.id});viewPlayerDash('${player.replace(/'/g,"\\'")}')">✕</button>
+          </div>`).join(''):'<p style="color:var(--mut);font-size:11px">Sin registros.</p>'}
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="sh">Entrenamientos (${training.length})</div>
+          ${training.length?training.slice(0,8).map(t=>`<div style="border-bottom:1px solid var(--brd);padding:7px 0">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:11px;font-weight:600">${t.date} · ${TYPE_LBL[t.type]||t.type}</span><span style="font-size:11px;color:var(--acc);font-weight:700">sRPE ${t.srpe}</span></div>
+            <div style="font-size:10px;color:var(--mut)">${t.effectiveTime}min · RPE ${t.rpe}/10 · Coef ${t.intensityCoeff}${t.notes?' · '+t.notes:''}</div>
+          </div>`).join(''):'<p style="color:var(--mut);font-size:11px">Sin registros.</p>'}
+        </div>
+        <div class="card">
+          <div class="sh">Bienestar reciente</div>
+          ${wellness.length?wellness.slice(0,6).map(w=>{const tot=w.sleep+w.fatigue+w.soreness+w.stress+w.mood;const col=tot>=20?'var(--green)':tot>=13?'var(--yel)':'var(--red)';return`<div style="border-bottom:1px solid var(--brd);padding:7px 0;display:flex;align-items:center;gap:8px">
+            <div style="font-size:11px;color:var(--mut);min-width:70px">${w.date}</div>
+            <div style="flex:1;height:5px;background:var(--surf2);border-radius:3px;overflow:hidden"><div style="width:${Math.round(tot/25*100)}%;height:100%;background:${col}"></div></div>
+            <div style="font-size:12px;font-weight:700;color:${col}">${tot}/25</div>
+          </div>`}).join(''):'<p style="color:var(--mut);font-size:11px">Sin registros.</p>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// MÉTRICAS — TRAINING LOG
+// ═══════════════════════════════════════════════════════
+let _trRpe=5;
+const _wellVals={sleep:3,fatigue:3,soreness:3,stress:3,mood:3};
+
+function metTab(tab,el){
+  document.querySelectorAll('#page-metricas .tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#page-metricas .tab-content').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('mt-'+tab).classList.add('on');
+  if(tab==='entrenamiento')renderTrainingHistory();
+  else if(tab==='bienestar'){buildWellnessButtons();renderWellnessHistory()}
+  else if(tab==='lesiones')renderInjuryHistory();
+}
+
+function renderMetricas(){
+  const players=Object.keys(S.profiles);
+  const sel=document.getElementById('metricas-player');
+  if(sel){const cur=sel.value;sel.innerHTML='<option value="">— Todos —</option>'+players.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('')}
+  const today=new Date().toISOString().slice(0,10);
+  ['tr-date','well-date','inj-date'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=today});
+  buildRpeButtons();
+  buildWellnessButtons();
+  renderTrainingHistory();
+}
+
+function onMetricasPlayer(){renderTrainingHistory();renderWellnessHistory();renderInjuryHistory()}
+
+function buildRpeButtons(){
+  const el=document.getElementById('tr-rpe-btns');if(!el)return;
+  el.innerHTML=[...Array(11)].map((_,i)=>`<button class="wr-btn${i===_trRpe?' on':''}" onclick="setRpe(${i})">${i}</button>`).join('');
+  updateSrpe();
+}
+
+function setRpe(v){_trRpe=v;buildRpeButtons()}
+
+function updateSrpe(){
+  const time=parseFloat(document.getElementById('tr-time')?.value||60);
+  const coeff=parseFloat(document.getElementById('tr-coeff')?.value||1);
+  const srpe=Math.round(_trRpe*time*coeff);
+  const el=document.getElementById('tr-srpe');if(el)el.textContent=srpe;
+  return srpe;
+}
+
+async function saveTraining(){
+  const player=document.getElementById('metricas-player')?.value;
+  if(!player){toast('Selecciona un jugador','e');return}
+  const date=document.getElementById('tr-date').value;
+  if(!date){toast('Selecciona fecha','e');return}
+  const type=document.getElementById('tr-type').value;
+  const effectiveTime=parseFloat(document.getElementById('tr-time').value)||0;
+  const intensityCoeff=parseFloat(document.getElementById('tr-coeff').value)||1;
+  const rpe=_trRpe;const srpe=updateSrpe();
+  const notes=document.getElementById('tr-notes').value;
+  await dbPut('training',{id:Date.now(),player,date,type,effectiveTime,intensityCoeff,rpe,srpe,notes});
+  toast('Entrenamiento guardado','s');renderTrainingHistory();
+}
+
+async function renderTrainingHistory(){
+  const el=document.getElementById('tr-history');if(!el)return;
+  const player=document.getElementById('metricas-player')?.value;
+  const all=await dbAll('training');
+  const rows=(player?all.filter(t=>t.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
+  const TYPE_LBL={gym:'🏋️ Gimnasio',field:'🏀 Pista',match:'🏆 Partido',other:'📝 Otro'};
+  if(!rows.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';return}
+  el.innerHTML=rows.map(t=>`
+    <div style="border-bottom:1px solid var(--brd);padding:8px 0;display:flex;align-items:start;gap:8px">
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600">${t.date} · ${TYPE_LBL[t.type]||t.type}${!player&&t.player?' · '+t.player:''}</div>
+        <div style="font-size:10px;color:var(--mut)">${t.effectiveTime}min · RPE ${t.rpe}/10 · Coef. ${t.intensityCoeff}</div>
+        <div style="font-size:13px;color:var(--acc);font-weight:700">sRPE: ${t.srpe}</div>
+        ${t.notes?`<div style="font-size:10px;color:var(--mut)">${t.notes}</div>`:''}
+      </div>
+      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delTraining(${t.id})">✕</button>
+    </div>`).join('');
+}
+async function delTraining(id){await dbDel('training',id);renderTrainingHistory();toast('Eliminado','s')}
+
+// ── Wellness ──────────────────────────────────────────
+function buildWellnessButtons(){
+  const dims=['sleep','fatigue','soreness','stress','mood'];
+  dims.forEach(dim=>{
+    const el=document.getElementById('wr-'+dim);if(!el)return;
+    el.innerHTML=[...Array(5)].map((_,i)=>{const v=i+1;return`<button class="wr-btn${_wellVals[dim]===v?' on':''}" onclick="setWell('${dim}',${v})">${v}</button>`}).join('');
+  });
+  updateWellTotal();
+}
+
+function setWell(dim,val){_wellVals[dim]=val;buildWellnessButtons()}
+
+function updateWellTotal(){
+  const total=Object.values(_wellVals).reduce((a,v)=>a+v,0);
+  const col=total>=20?'var(--green)':total>=13?'var(--yel)':'var(--red)';
+  const el=document.getElementById('well-total');if(el){el.textContent=total;el.style.color=col}
+}
+
+async function saveWellness(){
+  const player=document.getElementById('metricas-player')?.value;
+  if(!player){toast('Selecciona un jugador','e');return}
+  const date=document.getElementById('well-date').value;
+  if(!date){toast('Selecciona fecha','e');return}
+  await dbPut('wellness',{id:Date.now(),player,date,..._wellVals});
+  toast('Bienestar guardado','s');renderWellnessHistory();
+}
+
+async function renderWellnessHistory(){
+  const el=document.getElementById('well-history');if(!el)return;
+  const player=document.getElementById('metricas-player')?.value;
+  const all=await dbAll('wellness');
+  const rows=(player?all.filter(w=>w.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!rows.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';return}
+  el.innerHTML=rows.map(w=>{
+    const tot=w.sleep+w.fatigue+w.soreness+w.stress+w.mood;
+    const col=tot>=20?'var(--green)':tot>=13?'var(--yel)':'var(--red)';
+    return`<div style="border-bottom:1px solid var(--brd);padding:8px 0;display:flex;align-items:center;gap:8px">
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600">${w.date}${!player&&w.player?' · '+w.player:''}</div>
+        <div style="font-size:10px;color:var(--mut)">Sueño:${w.sleep} Fatiga:${w.fatigue} Dolor:${w.soreness} Estrés:${w.stress} Ánimo:${w.mood}</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:${col}">${tot}/25</div>
+      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delWellness(${w.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+async function delWellness(id){await dbDel('wellness',id);renderWellnessHistory();toast('Eliminado','s')}
+
+// ── Injuries ──────────────────────────────────────────
+async function saveInjury(){
+  const player=document.getElementById('metricas-player')?.value;
+  if(!player){toast('Selecciona un jugador','e');return}
+  const location=document.getElementById('inj-location').value.trim();
+  if(!location){toast('Introduce localización','e');return}
+  const date=document.getElementById('inj-date').value||new Date().toISOString().slice(0,10);
+  const status=document.getElementById('inj-status').value;
+  const notes=document.getElementById('inj-notes').value;
+  await dbPut('injuries',{id:Date.now(),player,date,location,status,notes});
+  toast('Lesión guardada','s');renderInjuryHistory();
+}
+
+async function renderInjuryHistory(){
+  const el=document.getElementById('inj-history');if(!el)return;
+  const player=document.getElementById('metricas-player')?.value;
+  const all=await dbAll('injuries');
+  const rows=(player?all.filter(i=>i.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!rows.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';return}
+  el.innerHTML=rows.map(i=>`
+    <div class="sc" style="padding:8px 10px;margin-bottom:4px">
+      <span class="badge ${i.status==='ok'?'inj-ok':i.status==='watch'?'inj-watch':'inj-out'}">${i.status==='ok'?'OK':i.status==='watch'?'Seguimiento':'Baja'}</span>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600">${i.location}${!player&&i.player?' · '+i.player:''}</div>
+        <div style="font-size:10px;color:var(--mut)">${i.date}${i.notes?' · '+i.notes:''}</div>
+      </div>
+      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delInjury(${i.id})">✕</button>
+    </div>`).join('');
+}
+async function delInjury(id){await dbDel('injuries',id);renderInjuryHistory();toast('Eliminado','s')}
+
+// ═══════════════════════════════════════════════════════
+// FEB SCRAPING
+// ═══════════════════════════════════════════════════════
+async function fetchFEB(){
+  const url=document.getElementById('feb-url').value.trim();
+  if(!url){toast('Introduce una URL','e');return}
+  const statusEl=document.getElementById('feb-status');
+  const tableEl=document.getElementById('feb-table');
+  statusEl.innerHTML='<div class="al ai">⏳ Obteniendo datos vía proxy...</div>';
+  tableEl.innerHTML='';
+
+  try{
+    const proxyUrl='https://api.allorigins.win/get?url='+encodeURIComponent(url);
+    const resp=await fetch(proxyUrl,{signal:AbortSignal.timeout(12000)});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    const html=data.contents;
+    if(!html)throw new Error('Sin contenido');
+
+    const parser=new DOMParser();
+    const doc=parser.parseFromString(html,'text/html');
+    const tables=[...doc.querySelectorAll('table')];
+    if(!tables.length){statusEl.innerHTML='<div class="al aw">⚠️ Sin tablas. Usa entrada manual.</div>';showFEBManual();return}
+
+    // Pick table with most header columns
+    let best=tables[0];let bestN=0;
+    tables.forEach(t=>{const n=t.querySelectorAll('thead th,thead td').length;if(n>bestN){bestN=n;best=t}});
+
+    statusEl.innerHTML='<div class="al as">✅ Tabla obtenida. Revisa y guarda.</div>';
+    best.style.cssText='width:100%;border-collapse:collapse;font-size:11px';
+    tableEl.innerHTML=`<div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:8px 14px;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center">
+        <span class="sh" style="margin:0">Estadísticas scrapeadas (${new Date().toLocaleDateString('es-ES')})</span>
+        <button class="btn bp" onclick="toast('Tabla guardada como referencia','s')">💾 Guardar</button>
+      </div>
+      <div class="tw" style="padding:8px">${best.outerHTML}</div>
+    </div>`;
+  }catch(e){
+    statusEl.innerHTML=`<div class="al aw">⚠️ Error: ${e.message}. Introduce datos manualmente.</div>`;
+    showFEBManual();
+  }
+}
+
+function showFEBManual(){
+  const players=Object.keys(S.profiles);
+  document.getElementById('feb-table').innerHTML=`
+    <div class="card">
+      <div class="sh">Entrada manual de estadísticas de partido</div>
+      <div class="g2" style="margin-bottom:10px">
+        <div><label class="lbl">Fecha</label><input type="date" id="feb-date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div><label class="lbl">Rival</label><input id="feb-rival" placeholder="Nombre del equipo rival"></div>
+      </div>
+      ${players.length?players.map(p=>`
+        <div style="border-top:1px solid var(--brd);padding:8px 0;margin-top:6px">
+          <div style="font-weight:600;font-size:12px;margin-bottom:6px">${p}</div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
+            ${['PTS','REB','AST','MIN','+/-','VAL'].map(stat=>`<div><label class="lbl">${stat}</label><input type="number" id="feb-${stat.toLowerCase().replace('/','')}-${p.replace(/\s/g,'_')}" value="0" min="0"></div>`).join('')}
+          </div>
+        </div>`).join(''):'<p style="color:var(--mut);font-size:11px">Crea perfiles de jugador primero.</p>'}
+      ${players.length?`<button class="btn bp bw" style="margin-top:12px" onclick="saveFEBManual()">💾 Guardar estadísticas</button>`:''}
+    </div>`;
+}
+
+async function saveFEBManual(){
+  const date=document.getElementById('feb-date')?.value||new Date().toISOString().slice(0,10);
+  const rival=document.getElementById('feb-rival')?.value.trim()||'Desconocido';
+  let saved=0;
+  for(const player of Object.keys(S.profiles)){
+    const k=player.replace(/\s/g,'_');
+    const get=stat=>parseInt(document.getElementById(`feb-${stat}-${k}`)?.value)||0;
+    const pts=get('pts'),reb=get('reb'),ast=get('ast'),min=get('min'),pm=get(''),val=get('val');
+    if(pts||reb||ast||min){
+      await dbPut('game_stats',{id:Date.now()+Math.random(),player,date,rival,pts,reb,ast,min,pm,val});
+      saved++;
+    }
+  }
+  toast(`${saved} jugadores guardados`,'s');
+}
+
+// ═══════════════════════════════════════════════════════
+// MCP INTEGRATION
+// ═══════════════════════════════════════════════════════
+async function mcpSave(){
+  const url=document.getElementById('mcp-url').value.trim();
+  const token=document.getElementById('mcp-token').value.trim();
+  await dbPut('cfg',{k:'mcp',v:{url,token}});
+  toast('Configuración MCP guardada','s');
+}
+
+async function mcpPush(){
+  const cfgRec=await dbGet('cfg','mcp');
+  const cfg=cfgRec?.v;
+  if(!cfg?.url){toast('Configura el endpoint primero','e');return}
+  const statusEl=document.getElementById('mcp-status');
+  statusEl.innerHTML='<div class="al ai">⏳ Enviando datos...</div>';
+
+  const payload={};
+  if(document.getElementById('mcp-imu').checked)payload.sessions=await dbAll('sessions');
+  if(document.getElementById('mcp-training').checked)payload.training=await dbAll('training');
+  if(document.getElementById('mcp-wellness').checked)payload.wellness=await dbAll('wellness');
+  if(document.getElementById('mcp-injuries').checked)payload.injuries=await dbAll('injuries');
+  if(document.getElementById('mcp-game').checked)payload.game_stats=await dbAll('game_stats');
+
+  const counts=Object.entries(payload).map(([k,v])=>`${k}:${v.length}`).join(' ');
+  try{
+    const resp=await fetch(cfg.url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json',...(cfg.token?{'Authorization':'Bearer '+cfg.token}:{})},
+      body:JSON.stringify({source:'redline-imu',timestamp:new Date().toISOString(),data:payload}),
+    });
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    statusEl.innerHTML=`<div class="al as">✅ Datos enviados — ${counts}</div>`;
+    toast('Datos enviados al MCP','s');
+  }catch(e){
+    statusEl.innerHTML=`<div class="al aw">❌ Error: ${e.message}</div>`;
+    toast('Error al enviar: '+e.message,'e');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1462,6 +2140,7 @@ async function init(){
   dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');handleFile(e.dataTransfer.files[0])});
   document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on')}));
   try{const cfg=await dbGet('cfg','dir');if(cfg?.v){const p=await cfg.v.queryPermission({mode:'readwrite'});if(p==='granted'||p==='prompt'){S.dirHandle=cfg.v;setFolderUI(cfg.v.name)}}}catch{}
+  try{const m=await dbGet('cfg','mcp');if(m?.v){const u=document.getElementById('mcp-url');const t=document.getElementById('mcp-token');if(u)u.value=m.v.url||'';if(t)t.value=m.v.token||''}}catch{}
 }
 
 init();
