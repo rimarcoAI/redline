@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redline IMU Analyzer 🏀</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--yellow:#eab308;--purple:#a855f7;--r:8px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+
+/* NAV */
+nav{width:210px;min-width:210px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0;overflow:hidden}
+.logo{padding:0 18px 16px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.logo h1{font-size:18px;font-weight:700;color:var(--accent)}
+.logo p{font-size:11px;color:var(--muted)}
+.nb{display:flex;align-items:center;gap:9px;padding:9px 18px;cursor:pointer;border:none;background:none;color:var(--muted);font-size:13px;width:100%;text-align:left;transition:.15s;border-left:3px solid transparent}
+.nb:hover{background:var(--surface2);color:var(--text)}
+.nb.on{background:var(--surface2);color:var(--accent);border-left-color:var(--accent)}
+.nb .ic{font-size:15px;width:18px;text-align:center}
+.nav-foot{margin-top:auto;padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);word-break:break-all}
+
+/* MAIN */
+main{flex:1;overflow-y:auto;padding:24px}
+.page{display:none}.page.on{display:block}
+h2{font-size:19px;margin-bottom:16px;font-weight:600}
+h3{font-size:11px;margin-bottom:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
+
+/* METRICS */
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:18px}
+.mc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.ml{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.mv{font-size:22px;font-weight:700}
+
+/* CHART */
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.ct{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px}
+canvas{max-height:240px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.bp{background:var(--accent);color:#fff}.bp:hover{opacity:.85}
+.bs{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.bs:hover{background:var(--border)}
+.bd{background:transparent;color:var(--red);border:1px solid var(--red)}.bd:hover{background:var(--red);color:#fff}
+.bw{width:100%;justify-content:center}
+.bg{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+
+/* INPUTS */
+input,select{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 11px;font-size:13px;outline:none;width:100%}
+input:focus,select:focus{border-color:var(--accent)}
+label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;margin-top:10px}
+input[type=range]{padding:0;height:4px;accent-color:var(--accent)}
+
+/* DROP ZONE */
+.dz{border:2px dashed var(--border);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:14px}
+.dz:hover,.dz.over{border-color:var(--accent);background:rgba(249,115,22,.05)}
+.dz .di{font-size:36px;margin-bottom:10px}
+.dz p{color:var(--muted);font-size:12px}
+.dz strong{color:var(--text)}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 11px;background:var(--surface2);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+td{padding:7px 11px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--surface2)}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600}
+
+/* ALERT */
+.al{padding:11px 14px;border-radius:6px;font-size:13px;margin-bottom:12px}
+.ai{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:#93c5fd}
+.aw{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);color:#fde047}
+.as{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.ae{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+
+/* TOAST */
+#toast{position:fixed;bottom:22px;right:22px;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;z-index:999;max-width:300px}
+#toast.on{opacity:1}
+
+/* PROFILE ITEMS */
+.pi{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:.15s;margin-bottom:6px}
+.pi:hover{border-color:var(--accent)}.pi.sel{border-color:var(--accent);background:rgba(249,115,22,.08)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+
+/* SESSION CARD */
+.sc{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:14px}
+
+/* SLIDER ROW */
+.sr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sl{font-size:11px;color:var(--muted);min-width:230px}
+.sv{font-size:12px;font-weight:600;min-width:54px;text-align:right}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:500}
+.mo.on{display:flex}
+.md{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;width:100%;max-width:420px}
+.md h3{font-size:16px;color:var(--text);margin-bottom:14px;text-transform:none;letter-spacing:0}
+
+/* FOLDER STATUS */
+.fs-bar{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:10px}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+hr.div{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+@media(max-width:780px){
+  nav{width:54px;min-width:54px}
+  .nb span:last-child,.logo p,.logo h1,.nav-foot{display:none}
+  .g2,.g3{grid-template-columns:1fr}
+  main{padding:14px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><h1>🏀 Redline</h1><p>IMU BT50 Analyzer</p></div>
+  <button class="nb on" onclick="pg('import')"     id="n-import">    <span class="ic">📂</span><span>Importar</span></button>
+  <button class="nb"    onclick="pg('thresholds')" id="n-thresholds"><span class="ic">⚙️</span><span>Umbrales</span></button>
+  <button class="nb"    onclick="pg('analysis')"   id="n-analysis">  <span class="ic">📈</span><span>Análisis</span></button>
+  <button class="nb"    onclick="pg('events')"     id="n-events">    <span class="ic">🏷️</span><span>Eventos</span></button>
+  <button class="nb"    onclick="pg('history')"    id="n-history">   <span class="ic">🗂️</span><span>Historial</span></button>
+  <button class="nb"    onclick="pg('export')"     id="n-export">    <span class="ic">💾</span><span>Exportar</span></button>
+  <div class="nav-foot" id="nav-folder">📁 Sin carpeta</div>
+</nav>
+
+<main>
+
+<!-- IMPORT -->
+<div class="page on" id="page-import">
+  <h2>Importar sesión</h2>
+  <div class="g2">
+    <div>
+      <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
+        <div class="di">📊</div>
+        <p><strong>Arrastra el CSV aquí</strong> o haz clic</p>
+        <p style="margin-top:6px;font-size:10px">timestamp · ax · ay · az · gx · gy · gz · roll · pitch · yaw</p>
+      </div>
+      <input type="file" id="fi" accept=".csv" style="display:none">
+      <div id="file-info"></div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Perfil de jugador</h3>
+        <div id="prof-list"><p style="color:var(--muted);font-size:12px">Sin perfiles. Crea uno.</p></div>
+        <hr class="div">
+        <button class="btn bs bw" onclick="showMo('mo-prof')">+ Nuevo perfil</button>
+      </div>
+      <div class="card" id="sel-prof-card" style="display:none">
+        <h3>Perfil activo</h3>
+        <div id="sel-prof-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- THRESHOLDS -->
+<div class="page" id="page-thresholds">
+  <h2>Umbrales de detección</h2>
+  <div class="g2">
+    <div>
+      <div class="card"><h3>🟢 Aceleración (sprint)</h3><div id="sl-acc"></div></div>
+      <div class="card"><h3>🔴 Deceleración</h3><div id="sl-dec"></div></div>
+      <div class="card"><h3>🔵 Salto</h3><div id="sl-jump"></div></div>
+    </div>
+    <div>
+      <div class="card"><h3>🟡 Cambio de dirección</h3><div id="sl-dir"></div></div>
+      <div class="card"><h3>🟣 Alta carga</h3><div id="sl-load"></div></div>
+      <div class="bg">
+        <button class="btn bs" onclick="saveThr()" id="btn-savethr" disabled style="flex:1">💾 Guardar en perfil</button>
+        <button class="btn bs" onclick="resetThr()" style="flex:1">↩ Restablecer</button>
+      </div>
+      <button class="btn bp bw" onclick="processSession()" id="btn-proc" disabled>▶ Procesar sesión</button>
+    </div>
+  </div>
+</div>
+
+<!-- ANALYSIS -->
+<div class="page" id="page-analysis">
+  <h2>Análisis de sesión</h2>
+  <div class="al ai" id="an-empty">Importa un CSV y pulsa <strong>Procesar sesión</strong>.</div>
+  <div id="an-content" style="display:none">
+    <div class="mg" id="metrics-grid"></div>
+    <div class="cc"><div class="ct">Aceleración horizontal &nbsp;<span style="color:#22c55e">■ Sprint</span>&nbsp;<span style="color:#ef4444">■ Decel.</span></div><canvas id="ch-acc"></canvas></div>
+    <div class="cc"><div class="ct">Aceleración vertical (az) &nbsp;<span style="color:#3b82f6">■ Salto</span></div><canvas id="ch-jump"></canvas></div>
+    <div class="cc"><div class="ct">Magnitud giroscopio &nbsp;<span style="color:#eab308">■ Cambio dirección</span></div><canvas id="ch-gyro"></canvas></div>
+    <div class="cc"><div class="ct">Player Load acumulado</div><canvas id="ch-load"></canvas></div>
+  </div>
+</div>
+
+<!-- EVENTS -->
+<div class="page" id="page-events">
+  <h2>Eventos detectados</h2>
+  <div class="al ai" id="ev-empty">Procesa la sesión para ver eventos.</div>
+  <div id="ev-content" style="display:none">
+    <div class="card" style="padding:10px 14px;margin-bottom:10px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px">Tipo:</span>
+        <select id="f-tipo" onchange="renderEvTbl()" style="width:190px">
+          <option value="">Todos</option>
+          <option>Aceleración</option><option>Deceleración</option>
+          <option>Salto</option><option>Cambio de dirección</option><option>Alta carga</option>
+        </select>
+        <span style="font-size:12px">Dur. mín. (s):</span>
+        <input type="number" id="f-dur" value="0" min="0" step="0.05" onchange="renderEvTbl()" style="width:70px">
+        <span id="ev-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+      </div>
+    </div>
+    <div class="card tw" style="padding:0;overflow:hidden">
+      <table><thead><tr><th>#</th><th>Tipo</th><th>Inicio (s)</th><th>Fin (s)</th><th>Duración (s)</th><th>Pico</th><th>Media</th></tr></thead>
+      <tbody id="ev-tbody"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>Estadísticas por tipo</h3>
+      <div class="tw"><table><thead><tr><th>Tipo</th><th>Cantidad</th><th>Dur. media (s)</th><th>Dur. total (s)</th><th>Pico máx.</th></tr></thead>
+      <tbody id="stats-tbody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <h2>Historial de sesiones</h2>
+  <div class="card" style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <span style="font-size:13px"><span id="hist-count">0 sesiones</span> <span style="color:var(--muted)">· guardadas en tu navegador</span></span>
+    <button class="btn bd" onclick="clearHist()">🗑 Borrar todo</button>
+  </div>
+  <div id="hist-list"><p style="color:var(--muted);font-size:12px">Sin sesiones guardadas.</p></div>
+</div>
+
+<!-- EXPORT -->
+<div class="page" id="page-export">
+  <h2>Exportar y guardar</h2>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <h3>Carpeta local de guardado</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Vincula una carpeta de tu ordenador. Cada sesión procesada se guardará automáticamente en una subcarpeta por jugador.</p>
+        <div class="fs-bar" id="fs-bar"><span>📁</span><span id="fs-name">Sin carpeta</span></div>
+        <button class="btn bp bw" onclick="pickFolder()" style="margin-bottom:6px">📂 Seleccionar carpeta</button>
+        <button class="btn bs bw" onclick="clearFolder()">✕ Desvincular</button>
+        <div class="al ai" style="margin-top:10px;font-size:11px">Compatible con Chrome y Edge. En Firefox usa descarga manual.</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Descarga manual</h3>
+        <div class="al aw" id="exp-empty">Procesa una sesión primero.</div>
+        <div id="exp-btns" style="display:none;flex-direction:column;gap:7px">
+          <button class="btn bs bw" onclick="dlEvents()">📋 Eventos (CSV)</button>
+          <button class="btn bs bw" onclick="dlSummary()">📊 Resumen (CSV)</button>
+          <button class="btn bs bw" onclick="dlJSON()">🗄 Sesión completa (JSON)</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Guardar en historial</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Almacena la sesión actual en IndexedDB (persiste aunque cierres el navegador).</p>
+        <button class="btn bp bw" onclick="saveToHist()" id="btn-savehist" disabled>💾 Guardar en historial</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- MODAL: New Profile -->
+<div class="mo" id="mo-prof">
+  <div class="md">
+    <h3>Nuevo perfil de jugador</h3>
+    <label>Nombre *</label><input id="p-name" placeholder="Nombre">
+    <label>Posición</label>
+    <select id="p-pos"><option>Base</option><option>Escolta</option><option>Alero</option><option>Ala-pívot</option><option>Pívot</option></select>
+    <label>Peso (kg)</label><input type="number" id="p-peso" value="80" min="40" max="160">
+    <label>Notas</label><input id="p-notas" placeholder="Opcional">
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn bp" onclick="createProf()" style="flex:1">Crear perfil</button>
+      <button class="btn bs" onclick="hideMo('mo-prof')" style="flex:1">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
+const DEF_THR = {
+  acc_threshold:2.0, acc_min_duration:0.3, acc_min_gap:1.0,
+  dec_threshold:5.0, dec_min_duration:0.2, dec_min_gap:1.0,
+  jump_threshold:2.5,jump_min_duration:0.15,jump_min_gap:0.8,
+  dir_threshold:150, dir_min_duration:0.15,dir_min_gap:0.5,
+  load_threshold:0.05,load_min_duration:0.2,load_min_gap:0.5,
+};
+
+const SL_CFG = {
+  acc: [
+    {k:'acc_threshold',    l:'Umbral aceleración horiz. (g)',min:.5,  max:8,   s:.1},
+    {k:'acc_min_duration', l:'Duración mínima (s)',          min:.1,  max:2,   s:.05},
+    {k:'acc_min_gap',      l:'Separación mínima (s)',        min:.2,  max:3,   s:.1},
+  ],
+  dec: [
+    {k:'dec_threshold',    l:'Umbral derivada acc. (g/s)',   min:1,   max:20,  s:.5},
+    {k:'dec_min_duration', l:'Duración mínima (s)',          min:.05, max:1,   s:.05},
+    {k:'dec_min_gap',      l:'Separación mínima (s)',        min:.2,  max:3,   s:.1},
+  ],
+  jump:[
+    {k:'jump_threshold',   l:'Umbral az vertical (g)',       min:1,   max:10,  s:.1},
+    {k:'jump_min_duration',l:'Duración mínima (s)',          min:.05, max:1,   s:.05},
+    {k:'jump_min_gap',     l:'Separación mínima (s)',        min:.2,  max:3,   s:.1},
+  ],
+  dir: [
+    {k:'dir_threshold',    l:'Umbral giroscopio (°/s)',      min:50,  max:600, s:10},
+    {k:'dir_min_duration', l:'Duración mínima (s)',          min:.05, max:1,   s:.05},
+    {k:'dir_min_gap',      l:'Separación mínima (s)',        min:.1,  max:2,   s:.1},
+  ],
+  load:[
+    {k:'load_threshold',   l:'Umbral carga instantánea',     min:.01, max:.5,  s:.005},
+    {k:'load_min_duration',l:'Duración mínima (s)',          min:.05, max:1,   s:.05},
+    {k:'load_min_gap',     l:'Separación mínima (s)',        min:.1,  max:2,   s:.1},
+  ],
+};
+
+const EV_COLORS = {
+  'Aceleración':'#22c55e','Deceleración':'#ef4444',
+  'Salto':'#3b82f6','Cambio de dirección':'#eab308','Alta carga':'#a855f7'
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+
+const S = {
+  raw:null, metrics:null, events:null, summary:null, fs:100,
+  thr:{...DEF_THR}, profiles:{}, activeProf:null,
+  dirHandle:null, charts:{},
+};
+
+// ─── INDEXEDDB ────────────────────────────────────────────────────────────────
+
+let db;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open('RedlineIMU',2);
+    r.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('sessions')){const s=d.createObjectStore('sessions',{keyPath:'id',autoIncrement:true});s.createIndex('date','date')}
+      if(!d.objectStoreNames.contains('cfg'))d.createObjectStore('cfg',{keyPath:'k'});
+    };
+    r.onsuccess=e=>{db=e.target.result;res(db)};
+    r.onerror=rej;
+  });
+}
+function dbPut(store,val){return new Promise((r,j)=>{const tx=db.transaction(store,'readwrite');const q=tx.objectStore(store).put(val);q.onsuccess=()=>r(q.result);q.onerror=j})}
+function dbGet(store,key){return new Promise((r,j)=>{const tx=db.transaction(store,'readonly');const q=tx.objectStore(store).get(key);q.onsuccess=()=>r(q.result);q.onerror=j})}
+function dbAll(store){return new Promise((r,j)=>{const tx=db.transaction(store,'readonly');const q=tx.objectStore(store).getAll();q.onsuccess=()=>r(q.result);q.onerror=j})}
+function dbDel(store,key){return new Promise((r,j)=>{const tx=db.transaction(store,'readwrite');const q=tx.objectStore(store).delete(key);q.onsuccess=()=>r();q.onerror=j})}
+function dbClear(store){return new Promise((r,j)=>{const tx=db.transaction(store,'readwrite');const q=tx.objectStore(store).clear();q.onsuccess=()=>r();q.onerror=j})}
+
+// ─── PROFILES (localStorage) ─────────────────────────────────────────────────
+
+function loadProfs(){try{S.profiles=JSON.parse(localStorage.getItem('rl_profs')||'{}')}catch{S.profiles={}}}
+function saveProfs(){localStorage.setItem('rl_profs',JSON.stringify(S.profiles))}
+
+function createProf(){
+  const name=document.getElementById('p-name').value.trim();
+  if(!name){toast('Escribe un nombre','e');return}
+  if(S.profiles[name]){toast('Ya existe','e');return}
+  S.profiles[name]={nombre:name,posicion:document.getElementById('p-pos').value,
+    peso:+document.getElementById('p-peso').value,notas:document.getElementById('p-notas').value,
+    thresholds:{...DEF_THR},created:new Date().toISOString()};
+  saveProfs();hideMo('mo-prof');document.getElementById('p-name').value='';
+  renderProfList();toast('Perfil creado: '+name,'s');
+}
+
+function delProf(name){
+  if(!confirm(`¿Eliminar "${name}"?`))return;
+  delete S.profiles[name];saveProfs();
+  if(S.activeProf===name)selProf(null);
+  renderProfList();toast('Perfil eliminado','s');
+}
+
+function selProf(name){
+  S.activeProf=name;
+  if(name&&S.profiles[name]){
+    S.thr={...DEF_THR,...S.profiles[name].thresholds};
+    updateSliderVals();
+    document.getElementById('btn-savethr').disabled=false;
+    renderSelProf();
+  } else {
+    document.getElementById('sel-prof-card').style.display='none';
+    document.getElementById('btn-savethr').disabled=true;
+  }
+  renderProfList();
+}
+
+function saveThr(){
+  if(!S.activeProf)return;
+  S.profiles[S.activeProf].thresholds={...S.thr};
+  saveProfs();toast('Umbrales guardados','s');
+}
+
+function resetThr(){S.thr={...DEF_THR};updateSliderVals();toast('Restablecidos','s')}
+
+function renderProfList(){
+  const el=document.getElementById('prof-list');
+  const keys=Object.keys(S.profiles);
+  if(!keys.length){el.innerHTML='<p style="color:var(--muted);font-size:12px">Sin perfiles.</p>';return}
+  el.innerHTML=keys.map(n=>{
+    const p=S.profiles[n],sel=n===S.activeProf;
+    return`<div class="pi${sel?' sel':''}" onclick="selProf('${n}')">
+      <div class="av">${n[0].toUpperCase()}</div>
+      <div style="flex:1"><div style="font-weight:600;font-size:13px">${n}</div>
+      <div style="font-size:11px;color:var(--muted)">${p.posicion||''} · ${p.peso||'—'} kg</div></div>
+      <button class="btn bs" style="padding:3px 7px;font-size:10px" onclick="event.stopPropagation();delProf('${n}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderSelProf(){
+  const p=S.profiles[S.activeProf];if(!p)return;
+  document.getElementById('sel-prof-card').style.display='';
+  document.getElementById('sel-prof-info').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="av" style="width:42px;height:42px;font-size:16px">${p.nombre[0].toUpperCase()}</div>
+      <div><div style="font-size:15px;font-weight:600">${p.nombre}</div>
+      <div style="font-size:11px;color:var(--muted)">${p.posicion} · ${p.peso} kg${p.notas?' · '+p.notas:''}</div></div>
+    </div>`;
+}
+
+// ─── SLIDERS ──────────────────────────────────────────────────────────────────
+
+function buildSliders(){
+  for(const [g,cfgs] of Object.entries(SL_CFG)){
+    document.getElementById('sl-'+g).innerHTML=cfgs.map(c=>`
+      <div class="sr">
+        <span class="sl">${c.l}</span>
+        <input type="range" id="sr-${c.k}" min="${c.min}" max="${c.max}" step="${c.s}"
+               value="${S.thr[c.k]}" oninput="onSl('${c.k}',this.value)">
+        <span class="sv" id="sv-${c.k}">${S.thr[c.k]}</span>
+      </div>`).join('');
+  }
+}
+
+function onSl(k,v){S.thr[k]=parseFloat(v);document.getElementById('sv-'+k).textContent=parseFloat(v)}
+function updateSliderVals(){
+  for(const cfgs of Object.values(SL_CFG))for(const c of cfgs){
+    const e=document.getElementById('sr-'+c.k),sv=document.getElementById('sv-'+c.k);
+    if(e){e.value=S.thr[c.k];sv.textContent=S.thr[c.k]}
+  }
+}
+
+// ─── CSV LOADING ──────────────────────────────────────────────────────────────
+
+const REQ=['timestamp','ax','ay','az','gx','gy','gz','roll','pitch','yaw'];
+
+function handleFile(f){
+  if(!f)return;
+  Papa.parse(f,{
+    header:true,dynamicTyping:true,skipEmptyLines:true,
+    complete:r=>{
+      const rows=r.data.map(row=>{const n={};for(const[k,v] of Object.entries(row))n[k.trim().toLowerCase()]=v;return n});
+      const missing=REQ.filter(c=>!Object.keys(rows[0]||{}).includes(c));
+      if(missing.length){toast('Faltan columnas: '+missing.join(', '),'e');return}
+      S.raw=rows;S.fs=estFs(rows);
+      renderFileInfo(f.name,rows.length,S.fs);
+      document.getElementById('btn-proc').disabled=false;
+      toast(`CSV cargado: ${rows.length.toLocaleString()} muestras · ${S.fs} Hz`,'s');
+    },
+    error:e=>toast('Error CSV: '+e.message,'e'),
+  });
+}
+
+function estFs(rows){
+  if(rows.length<2)return 100;
+  try{
+    const t0=new Date(rows[0].timestamp).getTime();
+    const t1=new Date(rows[Math.min(99,rows.length-1)].timestamp).getTime();
+    const dt=(t1-t0)/Math.min(99,rows.length-1)/1000;
+    return dt>0?Math.round(1/dt):100;
+  }catch{return 100}
+}
+
+function renderFileInfo(name,n,fs){
+  const dur=(n/fs/60).toFixed(1);
+  document.getElementById('file-info').innerHTML=`
+    <div class="card" style="border-color:var(--green)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">✅</span>
+        <div><div style="font-weight:600;font-size:13px">${name}</div>
+        <div style="font-size:11px;color:var(--muted)">${n.toLocaleString()} muestras · ${fs} Hz · ~${dur} min</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── SIGNAL PROCESSING ───────────────────────────────────────────────────────
+
+function movAvg(arr,w){
+  w=Math.max(1,Math.floor(w));
+  const n=arr.length,h=Math.floor(w/2);
+  const cs=new Float64Array(n+1);
+  for(let i=0;i<n;i++)cs[i+1]=cs[i]+arr[i];
+  const out=new Float64Array(n);
+  for(let i=0;i<n;i++){const lo=Math.max(0,i-h),hi=Math.min(n-1,i+h);out[i]=(cs[hi+1]-cs[lo])/(hi-lo+1)}
+  return out;
+}
+
+function grad(arr,dt){
+  const n=arr.length,out=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    if(i===0)out[i]=(arr[1]-arr[0])/dt;
+    else if(i===n-1)out[i]=(arr[i]-arr[i-1])/dt;
+    else out[i]=(arr[i+1]-arr[i-1])/(2*dt);
+  }
+  return out;
+}
+
+function computeMetrics(rows,fs){
+  const n=rows.length,dt=1/fs;
+  const ax=new Float64Array(n),ay=new Float64Array(n),az=new Float64Array(n);
+  const gx=new Float64Array(n),gy=new Float64Array(n),gz=new Float64Array(n);
+  for(let i=0;i<n;i++){ax[i]=rows[i].ax;ay[i]=rows[i].ay;az[i]=rows[i].az;gx[i]=rows[i].gx;gy[i]=rows[i].gy;gz[i]=rows[i].gz}
+
+  const acc_horiz=new Float64Array(n),acc_mag=new Float64Array(n),gyro_mag=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    acc_horiz[i]=Math.sqrt(ax[i]**2+ay[i]**2);
+    acc_mag[i]=Math.sqrt(ax[i]**2+ay[i]**2+az[i]**2);
+    gyro_mag[i]=Math.sqrt(gx[i]**2+gy[i]**2+gz[i]**2);
+  }
+
+  const sm=Math.round(fs*0.08);
+  const acc_horiz_sm=movAvg(acc_horiz,sm);
+  const az_smooth=movAvg(az,Math.round(fs*0.1));
+  const acc_deriv=grad(acc_horiz_sm,dt);
+
+  const dax=grad(ax,dt),day=grad(ay,dt),daz=grad(az,dt);
+  const load_inst=new Float64Array(n),load_cum=new Float64Array(n);
+  let cum=0;
+  for(let i=0;i<n;i++){load_inst[i]=Math.sqrt(dax[i]**2+day[i]**2+daz[i]**2)/fs;cum+=load_inst[i];load_cum[i]=cum}
+
+  const time_s=new Float64Array(n);
+  let t0=0;try{t0=new Date(rows[0].timestamp).getTime()}catch{}
+  for(let i=0;i<n;i++){try{time_s[i]=(new Date(rows[i].timestamp).getTime()-t0)/1000}catch{time_s[i]=i*dt}}
+
+  return{ax,ay,az,gx,gy,gz,acc_horiz,acc_mag,gyro_mag,acc_horiz_sm,az_smooth,acc_deriv,load_inst,load_cum,time_s,n,fs};
+}
+
+// ─── EVENT DETECTION ─────────────────────────────────────────────────────────
+
+function findGroups(mask,minS,minG){
+  minS=Math.max(1,minS);minG=Math.max(1,minG);
+  const groups=[],n=mask.length;
+  let on=false,st=0;
+  for(let i=0;i<=n;i++){
+    const a=i<n&&mask[i];
+    if(!on&&a){on=true;st=i}
+    else if(on&&!a){on=false;if(i-st>=minS)groups.push({s:st,e:i})}
+  }
+  const mg=[];
+  for(const g of groups){
+    if(mg.length&&g.s-mg[mg.length-1].e<minG)mg[mg.length-1].e=g.e;
+    else mg.push({...g});
+  }
+  return mg.filter(g=>g.e-g.s>=minS);
+}
+
+function toRecords(groups,sig,time_s,tipo){
+  return groups.map(g=>{
+    let pk=-Infinity,sum=0;
+    for(let i=g.s;i<g.e;i++){if(sig[i]>pk)pk=sig[i];sum+=sig[i]}
+    const cnt=g.e-g.s;
+    return{tipo,inicio_s:+time_s[g.s].toFixed(3),fin_s:+time_s[g.e-1].toFixed(3),
+           duracion_s:+(time_s[g.e-1]-time_s[g.s]).toFixed(3),pico:+pk.toFixed(4),media:+(sum/cnt).toFixed(4)};
+  });
+}
+
+function detectAll(m,t){
+  const {acc_horiz,acc_deriv,az_smooth,gyro_mag,load_inst,time_s,fs,n}=m;
+  const ms=s=>Math.max(1,Math.round(s*fs));
+
+  const mk=n=>new Uint8Array(n);
+
+  const amk=mk(n);for(let i=0;i<n;i++)amk[i]=acc_horiz[i]>t.acc_threshold?1:0;
+  const accelerations=toRecords(findGroups(amk,ms(t.acc_min_duration),ms(t.acc_min_gap)),acc_horiz,time_s,'Aceleración');
+
+  const dmk=mk(n);for(let i=0;i<n;i++)dmk[i]=acc_deriv[i]<-Math.abs(t.dec_threshold)?1:0;
+  const decAbs=new Float64Array(n);for(let i=0;i<n;i++)decAbs[i]=Math.abs(acc_deriv[i]);
+  const decelerations=toRecords(findGroups(dmk,ms(t.dec_min_duration),ms(t.dec_min_gap)),decAbs,time_s,'Deceleración');
+
+  const jmk=mk(n);for(let i=0;i<n;i++)jmk[i]=az_smooth[i]>t.jump_threshold?1:0;
+  const jumps=toRecords(findGroups(jmk,ms(t.jump_min_duration),ms(t.jump_min_gap)),az_smooth,time_s,'Salto');
+
+  const gmk=mk(n);for(let i=0;i<n;i++)gmk[i]=gyro_mag[i]>t.dir_threshold?1:0;
+  const direction_changes=toRecords(findGroups(gmk,ms(t.dir_min_duration),ms(t.dir_min_gap)),gyro_mag,time_s,'Cambio de dirección');
+
+  const lmk=mk(n);for(let i=0;i<n;i++)lmk[i]=load_inst[i]>t.load_threshold?1:0;
+  const high_load=toRecords(findGroups(lmk,ms(t.load_min_duration),ms(t.load_min_gap)),load_inst,time_s,'Alta carga');
+
+  return{accelerations,decelerations,jumps,direction_changes,high_load};
+}
+
+// ─── SUMMARY ─────────────────────────────────────────────────────────────────
+
+function computeSummary(m,ev){
+  const{time_s,acc_horiz,gyro_mag,load_cum,load_inst,n,fs}=m;
+  const dur=time_s[n-1],durMin=dur/60,totalLoad=load_cum[n-1];
+  const srt=[...load_inst].sort((a,b)=>a-b);
+  const th30=srt[Math.floor(n*.3)];
+  let act=0,peakA=0,peakG=0;
+  for(let i=0;i<n;i++){if(load_inst[i]>th30)act++;if(acc_horiz[i]>peakA)peakA=acc_horiz[i];if(gyro_mag[i]>peakG)peakG=gyro_mag[i]}
+  const na=ev.accelerations.length,nd=ev.decelerations.length,nj=ev.jumps.length,ndc=ev.direction_changes.length;
+  return{
+    'Duración':`${dur.toFixed(0)} s (${durMin.toFixed(1)} min)`,
+    'Muestras':n.toLocaleString(),'Freq. muestral':`${fs} Hz`,
+    'Player Load total':totalLoad.toFixed(2),'Load / min':(totalLoad/durMin).toFixed(2),
+    'Aceleraciones':na,'Deceleraciones':nd,'Saltos':nj,'Cambios dirección':ndc,
+    'Total eventos':na+nd+nj+ndc,
+    'Acc. horiz. máx.':`${peakA.toFixed(2)} g`,'Giroscopio máx.':`${peakG.toFixed(0)} °/s`,
+    'Ratio activo':`${(act/n*100).toFixed(0)}%`,
+  };
+}
+
+// ─── PROCESS ─────────────────────────────────────────────────────────────────
+
+function processSession(){
+  if(!S.raw){toast('Importa un CSV primero','e');return}
+  const btn=document.getElementById('btn-proc');
+  btn.textContent='⏳ Procesando...';btn.disabled=true;
+  setTimeout(()=>{
+    try{
+      const m=computeMetrics(S.raw,S.fs);
+      const ev=detectAll(m,S.thr);
+      const su=computeSummary(m,ev);
+      S.metrics=m;S.events=ev;S.summary=su;
+      renderAnalysis(m,ev,su);
+      renderEvTbl();
+      document.getElementById('exp-empty').style.display='none';
+      document.getElementById('exp-btns').style.display='flex';
+      document.getElementById('btn-savehist').disabled=false;
+      toast('Sesión procesada','s');
+      pg('analysis');
+      if(S.dirHandle)autoSave();
+    }catch(e){toast('Error: '+e.message,'e');console.error(e)}
+    btn.textContent='▶ Procesar sesión';btn.disabled=false;
+  },30);
+}
+
+// ─── CHARTS ──────────────────────────────────────────────────────────────────
+
+const regPlugin={
+  id:'reg',
+  beforeDraw(chart){
+    const{ctx,chartArea,scales,config}=chart;
+    const regs=config.options?.plugins?.reg?.regs||[];
+    if(!regs.length||!chartArea)return;
+    ctx.save();
+    for(const r of regs){
+      const x0=scales.x.getPixelForValue(r.s),x1=scales.x.getPixelForValue(r.e);
+      ctx.fillStyle=r.c;ctx.fillRect(x0,chartArea.top,x1-x0,chartArea.height);
+    }
+    ctx.restore();
+  }
+};
+Chart.register(regPlugin);
+
+const CHART_OPT=(regs,yLabel)=>({
+  animation:false,responsive:true,maintainAspectRatio:true,
+  interaction:{mode:'index',intersect:false},
+  plugins:{
+    legend:{labels:{color:'#8b949e',boxWidth:10,font:{size:10}}},
+    tooltip:{backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#8b949e'},
+    reg:{regs},
+  },
+  scales:{
+    x:{ticks:{color:'#8b949e',maxTicksLimit:10,font:{size:10}},grid:{color:'#21262d'},title:{display:true,text:'Tiempo (s)',color:'#8b949e',font:{size:10}}},
+    y:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'},title:{display:!!yLabel,text:yLabel||'',color:'#8b949e',font:{size:10}}},
+  },
+});
+
+function sub(arr,max){
+  if(arr.length<=max)return Array.from(arr);
+  const st=Math.ceil(arr.length/max),out=[];
+  for(let i=0;i<arr.length;i+=st)out.push(arr[i]);
+  return out;
+}
+
+function mkChart(id,labels,datasets,regs,yLabel){
+  if(S.charts[id]){S.charts[id].destroy();delete S.charts[id]}
+  const ctx=document.getElementById(id).getContext('2d');
+  S.charts[id]=new Chart(ctx,{type:'line',data:{labels,datasets},options:CHART_OPT(regs,yLabel)});
+}
+
+const MAX=2500;
+
+function renderAnalysis(m,ev,su){
+  document.getElementById('an-empty').style.display='none';
+  document.getElementById('an-content').style.display='';
+
+  // Metric cards
+  const SHOW=['Duración','Player Load total','Load / min','Aceleraciones','Deceleraciones','Saltos','Cambios dirección','Acc. horiz. máx.','Giroscopio máx.','Ratio activo'];
+  const COL={'Duración':'#3b82f6','Player Load total':'#22c55e','Load / min':'#22c55e',
+    'Aceleraciones':'#22c55e','Deceleraciones':'#ef4444','Saltos':'#3b82f6','Cambios dirección':'#eab308',
+    'Acc. horiz. máx.':'#f97316','Giroscopio máx.':'#eab308','Ratio activo':'#22c55e'};
+  document.getElementById('metrics-grid').innerHTML=SHOW.map(k=>`
+    <div class="mc" style="border-color:${(COL[k]||'#888')}33">
+      <div class="ml">${k}</div>
+      <div class="mv" style="color:${COL[k]||'#e6edf3'};font-size:${String(su[k]).length>6?'16':'20'}px">${su[k]}</div>
+    </div>`).join('');
+
+  const{time_s,acc_horiz,az,az_smooth,gyro_mag,load_cum,n}=m;
+  const st=Math.ceil(n/MAX);
+  const lbl=[];
+  for(let i=0;i<n;i+=st)lbl.push(time_s[i].toFixed(1));
+  function ds(arr){const o=[];for(let i=0;i<n;i+=st)o.push(+arr[i].toFixed(4));return o}
+
+  function regs(cats){
+    return cats.flatMap(cat=>(ev[cat]||[]).map(e=>({s:e.inicio_s,e:e.fin_s,c:EV_COLORS[e.tipo]+'44'})));
+  }
+
+  const LINE=(data,color,w=1.5)=>({data,borderColor:color,pointRadius:0,borderWidth:w,tension:.2,fill:false});
+
+  mkChart('ch-acc', lbl,[LINE(ds(acc_horiz),'#2196F3')],          regs(['accelerations','decelerations']),'g');
+  mkChart('ch-jump',lbl,[LINE(ds(az),'#9C27B0',.8),LINE(ds(az_smooth),'#E91E63',2)],regs(['jumps']),'g');
+  mkChart('ch-gyro',lbl,[LINE(ds(gyro_mag),'#FF9800')],           regs(['direction_changes']),'°/s');
+  mkChart('ch-load',lbl,[{...LINE(ds(load_cum),'#4CAF50',2),fill:{target:'origin',above:'rgba(76,175,80,.08)'}}],[]);
+}
+
+// ─── EVENTS TABLE ─────────────────────────────────────────────────────────────
+
+function allEvents(){
+  if(!S.events)return[];
+  return Object.values(S.events).flat().sort((a,b)=>a.inicio_s-b.inicio_s);
+}
+
+function renderEvTbl(){
+  if(!S.events)return;
+  document.getElementById('ev-empty').style.display='none';
+  document.getElementById('ev-content').style.display='';
+  const ft=document.getElementById('f-tipo').value;
+  const fd=parseFloat(document.getElementById('f-dur').value)||0;
+  let all=allEvents();
+  if(ft)all=all.filter(e=>e.tipo===ft);
+  if(fd>0)all=all.filter(e=>e.duracion_s>=fd);
+  document.getElementById('ev-count').textContent=`${all.length} eventos`;
+  document.getElementById('ev-tbody').innerHTML=all.map((e,i)=>{
+    const c=EV_COLORS[e.tipo]||'#888';
+    return`<tr><td style="color:var(--muted)">${i+1}</td>
+      <td><span class="badge" style="background:${c}22;color:${c}">${e.tipo}</span></td>
+      <td>${e.inicio_s}</td><td>${e.fin_s}</td><td>${e.duracion_s}</td>
+      <td style="font-weight:600">${e.pico}</td><td>${e.media}</td></tr>`;
+  }).join('');
+
+  const byT={};
+  for(const e of allEvents()){if(!byT[e.tipo])byT[e.tipo]=[];byT[e.tipo].push(e)}
+  document.getElementById('stats-tbody').innerHTML=Object.entries(byT).map(([tipo,evs])=>{
+    const c=EV_COLORS[tipo]||'#888';
+    const dAvg=(evs.reduce((a,e)=>a+e.duracion_s,0)/evs.length).toFixed(2);
+    const dTot=evs.reduce((a,e)=>a+e.duracion_s,0).toFixed(1);
+    const pkMax=Math.max(...evs.map(e=>e.pico)).toFixed(3);
+    return`<tr><td><span class="badge" style="background:${c}22;color:${c}">${tipo}</span></td>
+      <td style="font-weight:600">${evs.length}</td><td>${dAvg}</td><td>${dTot}</td><td>${pkMax}</td></tr>`;
+  }).join('');
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+
+function toCSV(rows,cols){
+  return cols.join(',')+'\n'+rows.map(r=>cols.map(c=>{const v=r[c]??'';return String(v).includes(',')?`"${v}"`:v}).join(',')).join('\n');
+}
+
+function dlBlob(content,name,mime='text/csv'){
+  const b=new Blob([content],{type:mime});
+  const u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
+}
+
+function dStr(d=new Date()){return d.toISOString().slice(0,19).replace(/[T:]/g,'-')}
+
+function dlEvents(){
+  const all=allEvents();if(!all.length){toast('Sin eventos','e');return}
+  dlBlob(toCSV(all,['tipo','inicio_s','fin_s','duracion_s','pico','media']),`eventos_${dStr()}.csv`);
+  toast('Eventos exportados','s');
+}
+
+function dlSummary(){
+  if(!S.summary){toast('Sin resumen','e');return}
+  const rows=Object.entries(S.summary).map(([k,v])=>({metrica:k,valor:v}));
+  dlBlob(toCSV(rows,['metrica','valor']),`resumen_${dStr()}.csv`);
+  toast('Resumen exportado','s');
+}
+
+function sessData(){
+  return{id:Date.now(),date:new Date().toISOString(),player:S.activeProf||'SinPerfil',
+    fs:S.fs,thresholds:{...S.thr},summary:S.summary,events:S.events};
+}
+
+function dlJSON(){
+  dlBlob(JSON.stringify(sessData(),null,2),`sesion_${dStr()}.json`,'application/json');
+  toast('JSON exportado','s');
+}
+
+// ─── FILE SYSTEM ACCESS API ───────────────────────────────────────────────────
+
+async function pickFolder(){
+  if(!('showDirectoryPicker' in window)){toast('Usa Chrome o Edge para esta función','e');return}
+  try{
+    const h=await window.showDirectoryPicker({mode:'readwrite',startIn:'documents'});
+    S.dirHandle=h;
+    await dbPut('cfg',{k:'dir',v:h});
+    setFolderUI(h.name);toast('Carpeta: '+h.name,'s');
+  }catch(e){if(e.name!=='AbortError')toast('Error: '+e.message,'e')}
+}
+
+async function clearFolder(){
+  S.dirHandle=null;await dbPut('cfg',{k:'dir',v:null});setFolderUI(null);toast('Carpeta desvinculada','s');
+}
+
+function setFolderUI(name){
+  document.getElementById('fs-name').textContent=name||'Sin carpeta';
+  document.getElementById('fs-bar').style.borderColor=name?'var(--green)':'var(--border)';
+  document.getElementById('nav-folder').textContent='📁 '+(name||'Sin carpeta');
+}
+
+async function writeFile(dirH,name,content){
+  const fh=await dirH.getFileHandle(name,{create:true});
+  const w=await fh.createWritable();await w.write(content);await w.close();
+}
+
+async function autoSave(){
+  if(!S.dirHandle||!S.summary)return;
+  try{
+    const perm=await S.dirHandle.requestPermission({mode:'readwrite'});
+    if(perm!=='granted')return;
+    const pname=(S.activeProf||'SinPerfil').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const pd=await S.dirHandle.getDirectoryHandle(pname,{create:true});
+    const ds_=dStr();
+    const all=allEvents();
+    if(all.length)await writeFile(pd,`${ds_}_eventos.csv`,toCSV(all,['tipo','inicio_s','fin_s','duracion_s','pico','media']));
+    await writeFile(pd,`${ds_}_sesion.json`,JSON.stringify(sessData(),null,2));
+    toast(`Guardado en ${pname}/`,'s');
+  }catch(e){if(e.name!=='AbortError')console.warn('autoSave:',e.message)}
+}
+
+// ─── HISTORY ─────────────────────────────────────────────────────────────────
+
+async function saveToHist(){
+  if(!S.summary){toast('Nada que guardar','e');return}
+  try{await dbPut('sessions',sessData());toast('Guardado en historial','s');renderHist()}
+  catch(e){toast('Error: '+e.message,'e')}
+}
+
+async function renderHist(){
+  const all=await dbAll('sessions');
+  all.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  document.getElementById('hist-count').textContent=`${all.length} sesiones`;
+  const el=document.getElementById('hist-list');
+  if(!all.length){el.innerHTML='<p style="color:var(--muted);font-size:12px">Sin sesiones guardadas.</p>';return}
+  el.innerHTML=all.map(s=>{
+    const d=new Date(s.date);
+    const df=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+    const tf=d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const ne=s.summary?.['Total eventos']??'—',ld=s.summary?.['Player Load total']??'—',du=s.summary?.['Duración']??'—';
+    return`<div class="sc">
+      <span style="font-size:26px">🏀</span>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${s.player}</div>
+        <div style="font-size:11px;color:var(--muted)">${df} · ${tf}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">${du} · ${ne} eventos · Load: ${ld}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn bs" style="padding:5px 9px;font-size:11px" onclick="dlHist(${s.id})">⬇</button>
+        <button class="btn bd" style="padding:5px 9px;font-size:11px" onclick="delHist(${s.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function dlHist(id){
+  const s=await dbGet('sessions',id);if(!s)return;
+  dlBlob(JSON.stringify(s,null,2),`sesion_${s.player}_${dStr(new Date(s.date))}.json`,'application/json');
+}
+async function delHist(id){
+  if(!confirm('¿Eliminar esta sesión?'))return;
+  await dbDel('sessions',id);renderHist();toast('Eliminada','s');
+}
+async function clearHist(){
+  if(!confirm('¿Borrar todo el historial? No se puede deshacer.'))return;
+  await dbClear('sessions');renderHist();toast('Historial borrado','s');
+}
+
+// ─── UI UTILS ─────────────────────────────────────────────────────────────────
+
+function pg(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page-'+name).classList.add('on');
+  document.getElementById('n-'+name).classList.add('on');
+  if(name==='history')renderHist();
+}
+
+function showMo(id){document.getElementById(id).classList.add('on')}
+function hideMo(id){document.getElementById(id).classList.remove('on')}
+
+let _tt;
+function toast(msg,type='s'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.background=type==='s'?'#166534':type==='e'?'#7f1d1d':'#713f12';
+  el.style.color=type==='s'?'#86efac':type==='e'?'#fca5a5':'#fde047';
+  el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),3000);
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────────────────────────
+
+function initDZ(){
+  const dz=document.getElementById('dz'),fi=document.getElementById('fi');
+  fi.addEventListener('change',()=>handleFile(fi.files[0]));
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');handleFile(e.dataTransfer.files[0])});
+  document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on')}));
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+
+async function init(){
+  await openDB();
+  loadProfs();renderProfList();
+  buildSliders();initDZ();
+  // Restore saved folder handle
+  try{
+    const cfg=await dbGet('cfg','dir');
+    if(cfg?.v){
+      const perm=await cfg.v.queryPermission({mode:'readwrite'});
+      if(perm==='granted'||perm==='prompt'){S.dirHandle=cfg.v;setFolderUI(cfg.v.name)}
+    }
+  }catch{}
+}
+
+init();
+</script>
+</body>
+</html>
