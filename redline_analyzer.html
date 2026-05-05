@@ -9,7 +9,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{
   --bg:#f1f5f9;--surf:#ffffff;--surf2:#f8fafc;--brd:#e2e8f0;
@@ -169,11 +168,6 @@ tr:hover td{background:#f8fafc}
 .tab:hover{color:var(--txt)}.tab.on{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
 .tab-content{display:none}.tab-content.on{display:block}
 
-/* INJURY BADGE COLORS */
-.inj-ok{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
-.inj-watch{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
-.inj-out{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-
 /* PLAYER ROSTER ITEM */
 .player-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;transition:all .15s;margin-bottom:4px;border:1px solid transparent}
 .player-item:hover{background:var(--surf2);border-color:var(--brd)}.player-item.sel{background:#eef2ff;border-color:#c7d2fe}
@@ -182,23 +176,10 @@ tr:hover td{background:#f8fafc}
 .nav-sec{font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.9px;padding:12px 18px 4px;opacity:.7}
 .nav-div{border-top:1px solid var(--brd);margin:8px 0}
 
-/* BODY MAP */
-.bz{cursor:pointer;transition:opacity .15s}
-.bz:hover{opacity:.75}
-
-/* PAIN SLIDER */
-.pain-bar{display:flex;gap:4px;flex-wrap:wrap}
-.pain-btn{padding:4px 8px;border:1px solid var(--brd);border-radius:5px;background:var(--surf);color:var(--mut);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s;min-width:30px;text-align:center}
-.pain-btn:hover{border-color:var(--acc)}.pain-btn.on{font-weight:700}
-
 /* TEAM CHARTS */
 .team-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
 .tc-card{background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
 
-/* CYCLE */
-.cycle-day{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;font-size:10px;font-weight:600;border:1px solid var(--brd);cursor:pointer;transition:all .15s}
-.cycle-day:hover{border-color:var(--acc);background:#eef2ff}.cycle-day.period{background:#fee2e2;border-color:#dc2626;color:#dc2626}
-.cycle-day.today{border-color:var(--acc);background:#eef2ff;color:var(--acc)}
 </style>
 </head>
 <body>
@@ -213,9 +194,8 @@ tr:hover td{background:#f8fafc}
   <button class="nb"    onclick="pg('history')"    id="n-history">   <span class="ic">🗂️</span><span>Historial</span></button>
   <button class="nb"    onclick="pg('export')"     id="n-export">    <span class="ic">💾</span><span>Exportar</span></button>
   <div class="nav-div"></div>
-  <div class="nav-sec">Equipo · Métricas</div>
+  <div class="nav-sec">Equipo</div>
   <button class="nb"    onclick="pg('equipo')"     id="n-equipo">    <span class="ic">👥</span><span>Equipo</span></button>
-  <button class="nb"    onclick="pg('metricas')"   id="n-metricas">  <span class="ic">📊</span><span>Métricas</span></button>
   <div class="nav-ft" id="nav-folder">📁 Sin carpeta</div>
 </nav>
 
@@ -390,185 +370,18 @@ tr:hover td{background:#f8fafc}
 <div class="page" id="page-equipo">
   <h2>Equipo</h2>
   <div style="display:flex;gap:14px;align-items:flex-start">
-    <div style="min-width:190px;max-width:210px">
+    <div style="min-width:200px;max-width:220px">
       <div class="card">
+        <div class="sh">Filtrar por grupo</div>
+        <select id="equipo-group-filter" onchange="renderEquipo()" style="margin-bottom:10px">
+          <option value="">— Todos —</option>
+        </select>
         <div class="sh">Jugadores</div>
         <div id="equipo-roster"><p style="color:var(--mut);font-size:11px">Sin jugadores.</p></div>
       </div>
     </div>
     <div style="flex:1" id="equipo-content">
       <div id="equipo-team-view"><p style="color:var(--mut);font-size:11px">Selecciona un jugador o crea perfiles primero.</p></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ MÉTRICAS ═══ -->
-<div class="page" id="page-metricas">
-  <h2>Métricas</h2>
-  <div class="card" style="padding:9px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
-    <span style="font-size:11px;color:var(--mut)">Jugador:</span>
-    <select id="metricas-player" onchange="onMetricasPlayer()" style="width:200px"></select>
-  </div>
-  <div class="tabs">
-    <div class="tab on"  onclick="metTab('entrenamiento',this)">📋 Entrenamiento</div>
-    <div class="tab"     onclick="metTab('bienestar',this)">💚 Bienestar</div>
-    <div class="tab"     onclick="metTab('lesiones',this)">🩺 Lesiones</div>
-    <div class="tab"     onclick="metTab('feb',this)">🏀 FEB Stats</div>
-    <div class="tab"     onclick="metTab('mcp',this)">🔗 MCP</div>
-    <div class="tab" id="tab-cycle" onclick="metTab('cycle',this)" style="display:none">🌙 Ciclo</div>
-  </div>
-
-  <!-- Entrenamiento -->
-  <div class="tab-content on" id="mt-entrenamiento">
-    <div class="g2">
-      <div class="card">
-        <div class="sh">Registrar sesión de entrenamiento</div>
-        <label class="lbl">Fecha</label><input type="date" id="tr-date">
-        <label class="lbl">Tipo</label>
-        <select id="tr-type"><option value="field" selected>🏀 Pista</option><option value="gym">🏋️ Gimnasio</option><option value="match">🏆 Partido</option><option value="other">📝 Otro</option></select>
-        <label class="lbl">Tiempo efectivo (min)</label>
-        <input type="number" id="tr-time" value="60" min="1" max="300" oninput="updateSrpe()">
-        <label class="lbl">Coeficiente de intensidad (0.5–2.0)</label>
-        <input type="number" id="tr-coeff" value="1.0" min="0.1" max="3" step="0.1" oninput="updateSrpe()">
-        <label class="lbl" style="margin-top:10px">RPE (0–10)</label>
-        <div class="wr" id="tr-rpe-btns"></div>
-        <div style="margin-top:9px;padding:9px 12px;background:var(--surf2);border-radius:6px;font-size:12px">
-          sRPE = RPE × tiempo × coef. = <span id="tr-srpe" style="color:var(--acc);font-weight:700;font-size:15px">300</span> <span style="color:var(--mut)">u.a.</span>
-        </div>
-        <label class="lbl">Notas</label><input id="tr-notes" placeholder="Opcional">
-        <button class="btn bp bw" style="margin-top:12px" onclick="saveTraining()">💾 Guardar entrenamiento</button>
-      </div>
-      <div class="card">
-        <div class="sh">Historial</div>
-        <div id="tr-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bienestar -->
-  <div class="tab-content" id="mt-bienestar">
-    <div class="g2">
-      <div class="card">
-        <div class="sh">Test de bienestar</div>
-        <label class="lbl">Fecha</label><input type="date" id="well-date">
-        <label class="lbl" style="margin-top:10px">Calidad del sueño</label><div class="wr" id="wr-sleep"></div>
-        <label class="lbl" style="margin-top:8px">Fatiga</label><div class="wr" id="wr-fatigue"></div>
-        <label class="lbl" style="margin-top:8px">Dolor muscular</label><div class="wr" id="wr-soreness"></div>
-        <label class="lbl" style="margin-top:8px">Nivel de estrés</label><div class="wr" id="wr-stress"></div>
-        <label class="lbl" style="margin-top:8px">Estado de ánimo</label><div class="wr" id="wr-mood"></div>
-        <div style="margin-top:10px;padding:9px 12px;background:var(--surf2);border-radius:6px;font-size:12px">
-          Total bienestar: <span id="well-total" style="color:var(--acc);font-weight:700;font-size:15px">—</span> <span style="color:var(--mut)">/ 25</span>
-        </div>
-        <button class="btn bp bw" style="margin-top:12px" onclick="saveWellness()">💾 Guardar bienestar</button>
-        <div id="mt-cycle-section" style="display:none;border-top:1px solid var(--brd);margin-top:14px;padding-top:12px">
-          <div class="sh">🌙 Ciclo menstrual</div>
-          <label class="lbl">Día del ciclo (1 = primer día de regla)</label>
-          <input type="number" id="cycle-day" min="1" max="40" value="1">
-          <label class="lbl" style="margin-top:8px">Intensidad del flujo</label>
-          <div class="wr" id="wr-flow"></div>
-          <label class="lbl" style="margin-top:8px">Dolor / dismenorrea</label>
-          <div class="wr" id="wr-cycle-pain"></div>
-          <label class="lbl" style="margin-top:8px">Notas (síntomas, etc.)</label>
-          <input id="cycle-notes" placeholder="Opcional">
-          <button class="btn bs bw" style="margin-top:10px" onclick="saveCycle()">💾 Guardar ciclo</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="sh">Historial</div>
-        <div id="well-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Lesiones -->
-  <div class="tab-content" id="mt-lesiones">
-    <div class="g2">
-      <div class="card">
-        <div class="sh">Registro de molestia / lesión</div>
-        <div style="display:flex;gap:14px;align-items:flex-start">
-          <div style="flex:1">
-            <label class="lbl">Fecha de inicio</label><input type="date" id="inj-date">
-            <label class="lbl" style="margin-top:8px">Zona del cuerpo (clic en el mapa →)</label>
-            <input id="inj-location" placeholder="Haz clic en el cuerpo o escribe..." style="margin-top:4px">
-            <label class="lbl" style="margin-top:8px">Estado</label>
-            <select id="inj-status">
-              <option value="ok">✅ Sin molestia</option>
-              <option value="watch">⚠️ Seguimiento</option>
-              <option value="out">🚫 Baja</option>
-            </select>
-            <label class="lbl" style="margin-top:8px">Nivel de dolor (0 = sin dolor)</label>
-            <div class="pain-bar" id="inj-pain-btns"></div>
-            <input type="hidden" id="inj-pain" value="0">
-            <label class="lbl" style="margin-top:8px">Notas</label>
-            <input id="inj-notes" placeholder="Descripción, tipo, tratamiento...">
-            <button class="btn bp bw" style="margin-top:12px" onclick="saveInjury()">💾 Guardar</button>
-          </div>
-          <div style="flex-shrink:0">
-            <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;text-align:center">Mapa corporal</div>
-            <div id="inj-body-map"></div>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="sh">Historial de lesiones</div>
-        <div id="inj-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- FEB Stats -->
-  <div class="tab-content" id="mt-feb">
-    <div class="card">
-      <div class="sh">🏀 Estadísticas de partido FEB — Importar PDF</div>
-      <p style="font-size:11px;color:var(--mut);margin-bottom:10px">Sube el PDF del acta del partido. Se intentará detectar automáticamente los jugadores que coincidan con los perfiles creados.</p>
-      <div style="display:flex;gap:7px;margin-bottom:10px;align-items:center">
-        <label class="btn bp" style="cursor:pointer">
-          📄 Seleccionar PDF
-          <input type="file" id="feb-pdf" accept=".pdf" style="display:none" onchange="handleFEBPdf(this.files[0])">
-        </label>
-        <span id="feb-pdf-name" style="font-size:11px;color:var(--mut)">Sin archivo</span>
-      </div>
-      <div id="feb-status"></div>
-      <div id="feb-table"></div>
-    </div>
-  </div>
-
-  <!-- Ciclo menstrual -->
-  <div class="tab-content" id="mt-cycle">
-    <div class="g2">
-      <div class="card">
-        <div class="sh">Historial del ciclo</div>
-        <div id="cycle-history" style="max-height:500px;overflow-y:auto"><p style="color:var(--mut);font-size:11px">Sin registros.</p></div>
-      </div>
-      <div class="card">
-        <div class="sh">Resumen del ciclo</div>
-        <div id="cycle-summary"><p style="color:var(--mut);font-size:11px">Sin datos.</p></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MCP -->
-  <div class="tab-content" id="mt-mcp">
-    <div class="card">
-      <div class="sh">🔗 Integración MCP myalbatross.ai</div>
-      <p style="font-size:11px;color:var(--mut);margin-bottom:10px">Configura el endpoint y token para enviar datos al servidor MCP.</p>
-      <label class="lbl">Endpoint URL</label>
-      <input id="mcp-url" placeholder="https://api.myalbatross.ai/ingest">
-      <label class="lbl">API Token</label>
-      <input id="mcp-token" type="password" placeholder="Bearer token...">
-      <div class="sh" style="margin-top:14px">Datos a enviar</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12px">
-        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-imu" checked style="width:auto"> Sesiones IMU</label>
-        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-training" checked style="width:auto"> Diario de entrenamiento</label>
-        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-wellness" checked style="width:auto"> Test de bienestar</label>
-        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-injuries" checked style="width:auto"> Lesiones</label>
-        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mcp-game" checked style="width:auto"> Estadísticas de partido</label>
-      </div>
-      <div style="display:flex;gap:7px">
-        <button class="btn bp" style="flex:1" onclick="mcpSave()">💾 Guardar config.</button>
-        <button class="btn bs" style="flex:1" onclick="mcpPush()">🚀 Enviar datos</button>
-      </div>
-      <div id="mcp-status" style="margin-top:10px"></div>
     </div>
   </div>
 </div>
