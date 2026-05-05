@@ -428,13 +428,16 @@
 
     <div id="pollen-error" style="display:none" class="api-message">
       <div class="icon">⚠️</div>
-      <h3>No se pudieron cargar los datos</h3>
-      <p id="error-msg"></p>
-      <p style="margin-top:12px">
-        Si estás abriendo el archivo directamente (file://), el navegador puede bloquear la petición por CORS.<br>
-        Prueba a ejecutarlo con un servidor local: <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">python3 -m http.server 8080</code>
+      <h3>No se pudieron cargar los datos del PIA</h3>
+      <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:8px">Se intentaron 5 fuentes (directa + 4 proxies CORS). Errores:</p>
+      <p id="error-msg" style="margin-bottom:16px"></p>
+      <p style="font-size:.8rem;color:var(--text-muted);line-height:1.7;margin-bottom:12px">
+        <strong style="color:var(--text)">Causa probable:</strong> aerobiologia.cat no permite peticiones desde otros dominios (política CORS).<br>
+        Los proxies públicos pueden estar saturados o caídos temporalmente.<br>
+        <strong style="color:var(--text)">Solución rápida:</strong> pulsa <em>Reintentar</em> en unos minutos — los proxies suelen recuperarse.<br>
+        Si el error persiste, abre la consola del navegador (F12 → Console) y comparte los mensajes para diagnosticar.
       </p>
-      <button class="refresh-btn" style="margin:16px auto 0;display:flex" onclick="fetchPollen(true)">↻ Reintentar</button>
+      <button class="refresh-btn" style="margin:0 auto;display:flex" onclick="fetchPollen(true)">↻ Reintentar</button>
     </div>
 
   </div><!-- /tab-pollen -->
@@ -613,58 +616,95 @@ function overallLevel(cards) {
 ═══════════════════════════════════════════════════ */
 const POLLEN_CACHE_KEY = 'pollenDataV2';
 const CACHE_TTL = 23 * 60 * 60 * 1000; // 23h
-const API_URL   = 'https://aerobiologia.cat/api/v0/forecast/balears/es/xml';
-const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(API_URL)}`;
+const API_URL = 'https://aerobiologia.cat/api/v0/forecast/balears/es/xml';
+
+// CORS proxy cascade — tried in order until one returns valid XML
+function proxyUrls() {
+  const enc = encodeURIComponent(API_URL);
+  return [
+    `https://corsproxy.io/?url=${enc}`,
+    `https://api.allorigins.win/raw?url=${enc}`,
+    `https://api.codetabs.com/v1/proxy?quest=${enc}`,
+    `https://thingproxy.freeboard.io/fetch/${API_URL}`,
+  ];
+}
 
 let forecastChartInstance = null;
 
+async function tryFetch(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000); // 8s timeout per proxy
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    // allorigins wraps in JSON when using /get; unwrap if needed
+    if (text.trim().startsWith('{')) {
+      try { const j = JSON.parse(text); return j.contents || j.body || text; } catch {}
+    }
+    return text;
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+function isValidXml(text) {
+  return typeof text === 'string' && text.trim().startsWith('<') && text.length > 80;
+}
+
 async function fetchPollen(force = false) {
-  // Check cache
+  // Serve from cache if fresh
   if (!force) {
     const cached = localStorage.getItem(POLLEN_CACHE_KEY);
     if (cached) {
       try {
         const obj = JSON.parse(cached);
-        if (Date.now() - obj.ts < CACHE_TTL) {
-          renderPollen(obj.xml, obj.ts);
-          return;
-        }
-      } catch (e) { /* ignore */ }
+        if (Date.now() - obj.ts < CACHE_TTL) { renderPollen(obj.xml, obj.ts); return; }
+      } catch {}
     }
   }
 
   showPollenLoading();
+  const errors = [];
   let xml = null;
-  let err = null;
 
-  // Try direct first, then proxy
-  for (const url of [API_URL, PROXY_URL]) {
+  for (const url of [API_URL, ...proxyUrls()]) {
+    const label = url.includes('corsproxy') ? 'corsproxy.io'
+                : url.includes('allorigins') ? 'allorigins.win'
+                : url.includes('codetabs')   ? 'codetabs.com'
+                : url.includes('thingproxy') ? 'thingproxy'
+                : 'directo';
+    updateLoadingMsg(`Probando ${label}…`);
     try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      // Validate it looks like XML
-      if (text.trim().startsWith('<') && text.length > 100) { xml = text; break; }
-    } catch (e) { err = e; }
+      const text = await tryFetch(url);
+      if (isValidXml(text)) { xml = text; console.log(`[Polen] OK via ${label}`); break; }
+      errors.push(`${label}: respuesta inválida (${text.slice(0,60)})`);
+    } catch (e) {
+      errors.push(`${label}: ${e.message}`);
+      console.warn(`[Polen] ${label} falló:`, e.message);
+    }
   }
 
   if (!xml) {
-    // Try to use last stale cache
+    // Fall back to stale cache rather than showing nothing
     const cached = localStorage.getItem(POLLEN_CACHE_KEY);
     if (cached) {
-      try {
-        const obj = JSON.parse(cached);
-        renderPollen(obj.xml, obj.ts, true);
-        return;
-      } catch (e) { /* ignore */ }
+      try { const obj = JSON.parse(cached); renderPollen(obj.xml, obj.ts, true); return; } catch {}
     }
-    showPollenError(err ? err.message : 'No se pudo conectar');
+    showPollenError(errors);
     return;
   }
 
   const ts = Date.now();
   localStorage.setItem(POLLEN_CACHE_KEY, JSON.stringify({ xml, ts }));
   renderPollen(xml, ts);
+}
+
+function updateLoadingMsg(msg) {
+  const el = document.querySelector('#pollen-loading h3');
+  if (el) el.textContent = msg;
 }
 
 function parsePollenXML(xml) {
@@ -747,11 +787,13 @@ function showPollenLoading() {
   document.getElementById('pollen-error').style.display = 'none';
 }
 
-function showPollenError(msg) {
+function showPollenError(errors) {
   document.getElementById('pollen-loading').style.display = 'none';
   document.getElementById('pollen-content').style.display = 'none';
   document.getElementById('pollen-error').style.display = '';
-  document.getElementById('error-msg').textContent = msg || '';
+  const list = Array.isArray(errors) ? errors : [errors];
+  document.getElementById('error-msg').innerHTML =
+    list.map(e => `<span style="display:block;font-size:.78rem;font-family:monospace;color:var(--text-dim)">${e}</span>`).join('');
 }
 
 function renderPollen(xml, ts, stale = false) {
