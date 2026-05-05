@@ -632,8 +632,8 @@ function bodyMapSVG(injuries=[],selId='',clickable=true){
   const injMap={};for(const i of injuries)if(i.zone_id)injMap[i.zone_id]=i;
   const zone=(tag,attrs,id)=>{
     const inj=injMap[id];
-    let fill='#21262d',stroke='#30363d',sw=1.5;
-    if(selId===id){fill='rgba(249,115,22,.3)';stroke='#f97316';sw=2.5}
+    let fill='#e2e8f0',stroke='#94a3b8',sw=1.5;
+    if(selId===id){fill='rgba(99,102,241,.2)';stroke='#6366f1';sw=2.5}
     else if(inj){
       if(inj.status==='ok'){fill='rgba(34,197,94,.2)';stroke='#22c55e'}
       else if(inj.status==='watch'){fill='rgba(234,179,8,.25)';stroke='#eab308';sw=2}
@@ -1284,7 +1284,7 @@ function renderSessionOverview(su,m){
   const dur=su['Duración']||'—',load=su['Player Load']||'—',lmin=su['Load/min']||'—';
   const accMax=su['Acc.máx.']||'—',gyroMax=su['Gyro máx.']||'—',muestras=su['Muestras']||'—';
   document.getElementById('sess-overview').innerHTML=`
-    <div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 18px;margin-bottom:12px">
+    <div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--brd)">
         <span style="font-size:18px">🏀</span>
         <div style="flex:1">
@@ -1294,8 +1294,8 @@ function renderSessionOverview(su,m){
         <div style="font-size:10px;color:var(--mut);text-align:right">${muestras} muestras · ${m.fs} Hz</div>
       </div>
       <div style="display:flex;gap:0;flex-wrap:wrap">
-        ${[['DURACIÓN',dur,'#3b82f6'],['PLAYER LOAD',load,'#22c55e'],['LOAD / MIN',lmin,'#22c55e'],
-           ['ACC. MÁX.',accMax,'#f97316'],['GYRO MÁX.',gyroMax,'#eab308']].map(([lbl,val,col],i)=>`
+        ${[['DURACIÓN',dur,'#2563eb'],['PLAYER LOAD',load,'#16a34a'],['LOAD / MIN',lmin,'#16a34a'],
+           ['ACC. MÁX.',accMax,'#6366f1'],['GYRO MÁX.',gyroMax,'#d97706']].map(([lbl,val,col],i)=>`
           <div style="flex:1;min-width:100px;padding:0 16px;${i>0?'border-left:1px solid var(--brd)':''}">
             <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${lbl}</div>
             <div style="font-size:18px;font-weight:700;color:${col}">${val}</div>
@@ -1329,7 +1329,7 @@ function renderKPIEvents(ev,m){
       </div>`;
     }).join('');
 
-    return`<div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 16px">
+    return`<div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
         <span style="font-size:15px">${meta.icon}</span>
         <span style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px">${meta.label}</span>
@@ -1366,7 +1366,7 @@ function renderLoadKPI(m,ev){
   }).join('');
 
   document.getElementById('kpi-load').innerHTML=`
-    <div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 18px">
+    <div style="background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <span style="font-size:15px">⚡</span>
         <span style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px">Player Load</span>
@@ -1374,11 +1374,11 @@ function renderLoadKPI(m,ev){
       </div>
       <div style="display:flex;align-items:flex-start;gap:24px">
         <div style="min-width:90px">
-          <div style="font-size:32px;font-weight:700;color:#22c55e;line-height:1">${totalLoad.toFixed(1)}</div>
+          <div style="font-size:32px;font-weight:700;color:#16a34a;line-height:1">${totalLoad.toFixed(1)}</div>
           <div style="font-size:9px;color:var(--mut);margin-top:2px">TOTAL</div>
         </div>
         <div style="min-width:70px;border-left:1px solid var(--brd);padding-left:20px">
-          <div style="font-size:22px;font-weight:700;color:#22c55e;line-height:1">${(totalLoad/(totalTime/60)).toFixed(2)}</div>
+          <div style="font-size:22px;font-weight:700;color:#16a34a;line-height:1">${(totalLoad/(totalTime/60)).toFixed(2)}</div>
           <div style="font-size:9px;color:var(--mut);margin-top:2px">POR MINUTO</div>
         </div>
         <div style="flex:1;border-left:1px solid var(--brd);padding-left:20px">
@@ -1868,8 +1868,8 @@ function hideMo(id){document.getElementById(id).classList.remove('on')}
 let _tt;
 function toast(msg,type='s'){
   const el=document.getElementById('toast');el.textContent=msg;
-  el.style.background=type==='s'?'#166534':type==='e'?'#7f1d1d':'#713f12';
-  el.style.color=type==='s'?'#86efac':type==='e'?'#fca5a5':'#fde047';
+  el.style.background=type==='s'?'#15803d':type==='e'?'#dc2626':'#d97706';
+  el.style.color='#ffffff';
   el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),3000);
 }
 
@@ -2009,7 +2009,7 @@ async function viewPlayerDash(player){
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-      ${[['Sesiones IMU',sessions.length,'#3b82f6'],['Load medio',avgLoad,'#22c55e'],['Bienestar',wellTotal!==null?wellTotal+'/25':'—','#a855f7'],['sRPE medio',avgSrpe,'#f97316']].map(([l,v,c])=>`<div class="mc"><div class="ml">${l}</div><div class="mv" style="color:${c}">${v}</div></div>`).join('')}
+      ${[['Sesiones IMU',sessions.length,'#2563eb'],['Load medio',avgLoad,'#16a34a'],['Bienestar',wellTotal!==null?wellTotal+'/25':'—','#9333ea'],['sRPE medio',avgSrpe,'#d97706']].map(([l,v,c])=>`<div class="mc"><div class="ml">${l}</div><div class="mv" style="color:${c}">${v}</div></div>`).join('')}
     </div>
     <div class="g2">
       <div>
