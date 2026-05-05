@@ -483,13 +483,15 @@ function deepClone(o){return JSON.parse(JSON.stringify(o))}
 let db;
 function openDB(){
   return new Promise((res,rej)=>{
-    const r=indexedDB.open('RedlineIMU',3);
+    const r=indexedDB.open('RedlineIMU',6);
     r.onupgradeneeded=e=>{
       const d=e.target.result;
       if(!d.objectStoreNames.contains('sessions')){const s=d.createObjectStore('sessions',{keyPath:'id',autoIncrement:true});s.createIndex('date','date')}
       if(!d.objectStoreNames.contains('cfg'))d.createObjectStore('cfg',{keyPath:'k'});
     };
-    r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=rej;
+    r.onsuccess=e=>{db=e.target.result;res(db)};
+    r.onerror=e=>{console.error('IndexedDB error',e.target.error);rej(e.target.error)};
+    r.onblocked=()=>{toast('Cierra otras pestañas de esta app y recarga','w')};
   });
 }
 const dbPut=(s,v)=>new Promise((r,j)=>{const tx=db.transaction(s,'readwrite');const q=tx.objectStore(s).put(v);q.onsuccess=()=>r(q.result);q.onerror=j});
