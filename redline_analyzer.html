@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
 <style>
 :root{
   --bg:#f1f5f9;--surf:#ffffff;--surf2:#f8fafc;--brd:#e2e8f0;
@@ -157,11 +158,6 @@ tr:hover td{background:#f8fafc}
 
 @media(max-width:760px){nav{width:52px;min-width:52px}.nb span:last-child,.logo p,.logo h1,.nav-ft{display:none}.g2,.g3{grid-template-columns:1fr}main{padding:14px}}
 
-/* WELLNESS RATING BUTTONS */
-.wr{display:flex;gap:5px;flex-wrap:wrap}
-.wr-btn{padding:5px 10px;border:1px solid var(--brd);border-radius:6px;background:var(--surf);color:var(--mut);cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s}
-.wr-btn:hover{border-color:var(--acc)}.wr-btn.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
-
 /* TABS */
 .tabs{display:flex;gap:0;border-bottom:2px solid var(--brd);margin-bottom:18px;overflow-x:auto}
 .tab{padding:9px 16px;cursor:pointer;font-size:12px;font-weight:500;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap}
@@ -197,6 +193,7 @@ tr:hover td{background:#f8fafc}
   <div class="nav-sec">Equipo</div>
   <button class="nb"    onclick="pg('equipo')"     id="n-equipo">    <span class="ic">👥</span><span>Equipo</span></button>
   <div class="nav-ft" id="nav-folder">📁 Sin carpeta</div>
+
 </nav>
 
 <main>
@@ -399,8 +396,8 @@ tr:hover td{background:#f8fafc}
         <select id="p-pos"><option>Base</option><option>Escolta</option><option>Alero</option><option>Ala-pívot</option><option>Pívot</option></select>
       </div>
       <div>
-        <label class="lbl">Género</label>
-        <select id="p-gender"><option value="M">Hombre</option><option value="F">Mujer</option></select>
+        <label class="lbl">Equipo/Grupo</label>
+        <input id="p-equipo" placeholder="Ej: Sub-18 A">
       </div>
     </div>
     <label class="lbl">Peso (kg)</label><input type="number" id="p-peso" value="80" min="40" max="160">
@@ -428,80 +425,8 @@ const TYPE_META = {
   direction_changes: {label:'Cambio de dirección',   icon:'🟡', signal:'gyro_mag',  unit:'°/s', chart_label:'Giroscopio (°/s)'},
 };
 
-const BODY_ZONES=[
-  {id:'cabeza',label:'Cabeza'},{id:'cuello',label:'Cuello'},
-  {id:'hombro-izq',label:'Hombro Izquierdo'},{id:'hombro-der',label:'Hombro Derecho'},
-  {id:'pecho',label:'Pecho / Tórax'},{id:'abdomen',label:'Abdomen'},{id:'lumbar',label:'Lumbar / Espalda'},
-  {id:'brazo-izq',label:'Brazo Izquierdo'},{id:'brazo-der',label:'Brazo Derecho'},
-  {id:'mano-izq',label:'Muñeca/Mano Izquierda'},{id:'mano-der',label:'Muñeca/Mano Derecha'},
-  {id:'cadera',label:'Cadera'},{id:'muslo-izq',label:'Muslo Izquierdo'},{id:'muslo-der',label:'Muslo Derecho'},
-  {id:'rodilla-izq',label:'Rodilla Izquierda'},{id:'rodilla-der',label:'Rodilla Derecha'},
-  {id:'pierna-izq',label:'Pierna Izquierda'},{id:'pierna-der',label:'Pierna Derecha'},
-  {id:'tobillo-izq',label:'Tobillo Izquierdo'},{id:'tobillo-der',label:'Tobillo Derecho'},
-  {id:'pie-izq',label:'Pie Izquierdo'},{id:'pie-der',label:'Pie Derecho'},
-];
-
-function bodyMapSVG(injuries=[],selId='',clickable=true){
-  const injMap={};for(const i of injuries)if(i.zone_id)injMap[i.zone_id]=i;
-  const zone=(tag,attrs,id)=>{
-    const inj=injMap[id];
-    let fill='#e2e8f0',stroke='#94a3b8',sw=1.5;
-    if(selId===id){fill='rgba(99,102,241,.2)';stroke='#6366f1';sw=2.5}
-    else if(inj){
-      if(inj.status==='ok'){fill='rgba(34,197,94,.2)';stroke='#22c55e'}
-      else if(inj.status==='watch'){fill='rgba(234,179,8,.25)';stroke='#eab308';sw=2}
-      else{fill='rgba(239,68,68,.35)';stroke='#ef4444';sw=2.5}
-    }
-    const lbl=BODY_ZONES.find(z=>z.id===id)?.label||id;
-    const tip=inj?`${lbl} — ${inj.status==='ok'?'OK':inj.status==='watch'?'Seguimiento':'Baja'}${inj.pain>0?' | Dolor '+inj.pain+'/10':''}`:lbl;
-    const a=Object.entries(attrs).map(([k,v])=>`${k}="${v}"`).join(' ');
-    const clk=clickable?`onclick="selectBodyZone('${id}')" `:'';
-    return`<${tag} ${a} fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${clk}rx="${attrs.rx||0}"><title>${tip}</title></${tag}>`;
-  };
-  return`<svg viewBox="0 0 120 265" width="110" height="240" xmlns="http://www.w3.org/2000/svg" style="display:block">
-    ${zone('ellipse',{cx:60,cy:17,rx:15,ry:16},'cabeza')}
-    ${zone('rect',{x:54,y:32,width:12,height:9,rx:3},'cuello')}
-    ${zone('ellipse',{cx:28,cy:51,rx:13,ry:9},'hombro-izq')}
-    ${zone('ellipse',{cx:92,cy:51,rx:13,ry:9},'hombro-der')}
-    ${zone('rect',{x:41,y:41,width:38,height:44,rx:5},'pecho')}
-    ${zone('rect',{x:43,y:85,width:34,height:28,rx:4},'abdomen')}
-    ${zone('rect',{x:43,y:113,width:34,height:16,rx:3},'lumbar')}
-    ${zone('rect',{x:15,y:46,width:11,height:52,rx:5},'brazo-izq')}
-    ${zone('rect',{x:94,y:46,width:11,height:52,rx:5},'brazo-der')}
-    ${zone('ellipse',{cx:20,cy:106,rx:9,ry:8},'mano-izq')}
-    ${zone('ellipse',{cx:100,cy:106,rx:9,ry:8},'mano-der')}
-    ${zone('rect',{x:43,y:129,width:34,height:16,rx:3},'cadera')}
-    ${zone('rect',{x:43,y:145,width:15,height:38,rx:5},'muslo-izq')}
-    ${zone('rect',{x:62,y:145,width:15,height:38,rx:5},'muslo-der')}
-    ${zone('ellipse',{cx:50,cy:187,rx:10,ry:8},'rodilla-izq')}
-    ${zone('ellipse',{cx:70,cy:187,rx:10,ry:8},'rodilla-der')}
-    ${zone('rect',{x:42,y:194,width:14,height:36,rx:5},'pierna-izq')}
-    ${zone('rect',{x:64,y:194,width:14,height:36,rx:5},'pierna-der')}
-    ${zone('ellipse',{cx:49,cy:234,rx:9,ry:6},'tobillo-izq')}
-    ${zone('ellipse',{cx:71,cy:234,rx:9,ry:6},'tobillo-der')}
-    ${zone('ellipse',{cx:47,cy:250,rx:14,ry:8},'pie-izq')}
-    ${zone('ellipse',{cx:73,cy:250,rx:14,ry:8},'pie-der')}
-  </svg>`;
-}
-
-let _selBodyZone='';
-let _febPlayers=[];
-function selectBodyZone(id){
-  _selBodyZone=id;
-  const z=BODY_ZONES.find(z=>z.id===id);
-  if(z){const el=document.getElementById('inj-location');if(el)el.value=z.label}
-  const mapEl=document.getElementById('inj-body-map');
-  if(mapEl)mapEl.innerHTML=bodyMapSVG([],id,true);
-}
-
-let _injPain=0;
-function buildInjPainButtons(){
-  const el=document.getElementById('inj-pain-btns');if(!el)return;
-  const colors=['#8b949e','#86efac','#4ade80','#eab308','#f97316','#ef4444','#dc2626','#b91c1c','#991b1b','#7f1d1d','#450a0a'];
-  el.innerHTML=[...Array(11)].map((_,i)=>`<button class="pain-btn${i===_injPain?' on':''}" style="${i===_injPain?'background:'+colors[i]+';border-color:'+colors[i]+';color:#fff':''}" onclick="setInjPain(${i})">${i}</button>`).join('');
-}
-function setInjPain(v){_injPain=v;document.getElementById('inj-pain').value=v;buildInjPainButtons()}
-
+// (body map, injury pain buttons, FEB, MCP removed)
+// placeholder to satisfy no-op below
 const LOAD_PRESETS = {
   standard: {label:'Estándar 3 ejes (Δacc)',  wx:1, wy:1, wz:1, useDerivative:true,  smoothBefore:0},
   horiz:    {label:'Horizontal (X+Y)',         wx:1, wy:1, wz:0, useDerivative:true,  smoothBefore:0},
@@ -558,16 +483,11 @@ function deepClone(o){return JSON.parse(JSON.stringify(o))}
 let db;
 function openDB(){
   return new Promise((res,rej)=>{
-    const r=indexedDB.open('RedlineIMU',5);
+    const r=indexedDB.open('RedlineIMU',3);
     r.onupgradeneeded=e=>{
       const d=e.target.result;
       if(!d.objectStoreNames.contains('sessions')){const s=d.createObjectStore('sessions',{keyPath:'id',autoIncrement:true});s.createIndex('date','date')}
       if(!d.objectStoreNames.contains('cfg'))d.createObjectStore('cfg',{keyPath:'k'});
-      if(!d.objectStoreNames.contains('training'))d.createObjectStore('training',{keyPath:'id',autoIncrement:true});
-      if(!d.objectStoreNames.contains('wellness'))d.createObjectStore('wellness',{keyPath:'id',autoIncrement:true});
-      if(!d.objectStoreNames.contains('injuries'))d.createObjectStore('injuries',{keyPath:'id',autoIncrement:true});
-      if(!d.objectStoreNames.contains('game_stats'))d.createObjectStore('game_stats',{keyPath:'id',autoIncrement:true});
-      if(!d.objectStoreNames.contains('menstrual'))d.createObjectStore('menstrual',{keyPath:'id',autoIncrement:true});
     };
     r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=rej;
   });
@@ -589,7 +509,7 @@ function createProf(){
   if(!name){toast('Escribe un nombre','e');return}
   if(S.profiles[name]){toast('Ya existe','e');return}
   S.profiles[name]={nombre:name,posicion:document.getElementById('p-pos').value,
-    genero:document.getElementById('p-gender').value,
+    equipo:document.getElementById('p-equipo').value.trim(),
     peso:+document.getElementById('p-peso').value,notas:document.getElementById('p-notas').value,
     config:deepClone(S.cfg),created:new Date().toISOString()};
   saveProfs();hideMo('mo-prof');document.getElementById('p-name').value='';
@@ -649,7 +569,7 @@ function renderSelProf(){
     <div style="display:flex;align-items:center;gap:9px">
       <div class="av" style="width:38px;height:38px;font-size:14px">${p.nombre[0].toUpperCase()}</div>
       <div><div style="font-size:14px;font-weight:600">${p.nombre}</div>
-      <div style="font-size:10px;color:var(--mut)">${p.posicion} · ${p.genero==='F'?'Mujer':'Hombre'} · ${p.peso} kg${p.notas?' · '+p.notas:''}</div></div>
+      <div style="font-size:10px;color:var(--mut)">${p.posicion}${p.equipo?' · '+p.equipo:''} · ${p.peso} kg${p.notas?' · '+p.notas:''}</div></div>
     </div>`;
 }
 
@@ -1674,7 +1594,6 @@ function pg(name){
   const nb=document.getElementById('n-'+name);if(nb)nb.classList.add('on');
   if(name==='history')renderHist();
   if(name==='equipo')renderEquipo();
-  if(name==='metricas')renderMetricas();
 }
 function showMo(id){document.getElementById(id).classList.add('on')}
 function hideMo(id){document.getElementById(id).classList.remove('on')}
@@ -1695,6 +1614,19 @@ async function renderEquipo(){
   const sessPlayers=[...new Set(sessions.map(s=>s.player))];
   const allPlayers=[...new Set([...profNames,...sessPlayers])].sort();
 
+  // Populate group filter dropdown
+  const groupSel=document.getElementById('equipo-group-filter');
+  const groups=[...new Set(profNames.map(n=>S.profiles[n]?.equipo||'').filter(Boolean))].sort();
+  const curGroup=groupSel?groupSel.value:'';
+  if(groupSel){
+    groupSel.innerHTML='<option value="">— Todos —</option>'+groups.map(g=>`<option${g===curGroup?' selected':''}>${g}</option>`).join('');
+  }
+  const filterGroup=groupSel?groupSel.value:'';
+
+  const filteredPlayers=filterGroup
+    ?allPlayers.filter(n=>S.profiles[n]?.equipo===filterGroup)
+    :allPlayers;
+
   const rosterEl=document.getElementById('equipo-roster');
   if(!allPlayers.length){rosterEl.innerHTML='<p style="color:var(--mut);font-size:11px">Sin jugadores.</p>';document.getElementById('equipo-team-view').innerHTML='';return}
 
@@ -1703,18 +1635,18 @@ async function renderEquipo(){
       <span style="font-size:14px">👥</span>
       <span style="font-size:12px;font-weight:600">Vista equipo</span>
     </div>`+
-    allPlayers.map(name=>{
+    filteredPlayers.map(name=>{
       const p=S.profiles[name];
       return`<div class="player-item" onclick="viewPlayerDash('${name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
         <div class="av" style="width:26px;height:26px;font-size:10px;flex-shrink:0">${name[0].toUpperCase()}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-          ${p?`<div style="font-size:9px;color:var(--mut)">${p.posicion||''}</div>`:''}
+          ${p?`<div style="font-size:9px;color:var(--mut)">${p.posicion||''}${p.equipo?' · '+p.equipo:''}</div>`:''}
         </div>
       </div>`;
     }).join('');
 
-  renderTeamDash(allPlayers,sessions);
+  renderTeamDash(filteredPlayers,sessions);
 }
 
 async function renderTeamDash(allPlayers,sessions){
@@ -1724,19 +1656,15 @@ async function renderTeamDash(allPlayers,sessions){
     const sPlayers=[...new Set(sessions.map(s=>s.player))];
     allPlayers=[...new Set([...profs,...sPlayers])].sort();
   }
-  const injuries=await dbAll('injuries');
   const rows=allPlayers.map(player=>{
     const pSess=sessions.filter(s=>s.player===player);
     const p=S.profiles[player]||{};
-    const lastInj=injuries.filter(i=>i.player===player).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    if(!pSess.length)return{player,posicion:p.posicion||'—',sessions:0,avgLoad:'—',lastDate:'—',injStatus:lastInj?.status||null};
+    if(!pSess.length)return{player,posicion:p.posicion||'—',equipo:p.equipo||'',sessions:0,avgLoad:'—',lastDate:'—'};
     const sorted=pSess.sort((a,b)=>new Date(b.sessionDate||b.date)-new Date(a.sessionDate||a.date));
     const avgLoad=(pSess.reduce((a,s)=>a+parseFloat(s.summary?.['Player Load']||0),0)/pSess.length).toFixed(1);
     const lastDate=new Date(sorted[0].sessionDate||sorted[0].date).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'});
-    return{player,posicion:p.posicion||'—',sessions:pSess.length,avgLoad,lastDate,injStatus:lastInj?.status||null};
+    return{player,posicion:p.posicion||'—',equipo:p.equipo||'',sessions:pSess.length,avgLoad,lastDate};
   });
-
-  const injBadge=s=>s?`<span class="badge ${s==='ok'?'inj-ok':s==='watch'?'inj-watch':'inj-out'}" style="font-size:9px">${s==='ok'?'OK':s==='watch'?'⚠️':'🚫'}</span>`:'';
 
   const el=document.getElementById('equipo-team-view');
   el.innerHTML=`
@@ -1744,17 +1672,17 @@ async function renderTeamDash(allPlayers,sessions){
       <div class="sh" style="margin-bottom:10px">Dashboard equipo — ${allPlayers.length} jugadores</div>
       <div class="tw">
         <table>
-          <thead><tr><th>Jugador</th><th>Posición</th><th>Sesiones</th><th>Load medio</th><th>Última sesión</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Jugador</th><th>Posición</th><th>Grupo</th><th>Sesiones</th><th>Load medio</th><th>Última sesión</th><th></th></tr></thead>
           <tbody>${rows.map(r=>`<tr>
             <td><div style="display:flex;align-items:center;gap:6px">
               <div class="av" style="width:22px;height:22px;font-size:10px;flex-shrink:0">${r.player[0].toUpperCase()}</div>
               <span style="font-weight:600">${r.player}</span>
             </div></td>
             <td style="color:var(--mut)">${r.posicion}</td>
+            <td style="color:var(--mut)">${r.equipo||'—'}</td>
             <td style="font-weight:700">${r.sessions}</td>
             <td style="color:var(--green);font-weight:700">${r.avgLoad}</td>
             <td style="color:var(--mut)">${r.lastDate}</td>
-            <td>${injBadge(r.injStatus)}</td>
             <td><button class="btn bs" style="padding:2px 8px;font-size:10px" onclick="viewPlayerDash('${r.player.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">Ver →</button></td>
           </tr>`).join('')}</tbody>
         </table>
@@ -1767,21 +1695,15 @@ async function renderTeamCharts(allPlayers, sessions){
   if(!sessions)sessions=await dbAll('sessions');
   const el=document.getElementById('equipo-team-view');
 
-  // Compute data per player
   const labels=allPlayers;
   const avgLoads=allPlayers.map(p=>{const ps=sessions.filter(s=>s.player===p);return ps.length?(ps.reduce((a,s)=>a+parseFloat(s.summary?.['Player Load']||0),0)/ps.length).toFixed(1):0});
   const sessionCounts=allPlayers.map(p=>sessions.filter(s=>s.player===p).length);
-  const avgEvents=allPlayers.map(p=>{const ps=sessions.filter(s=>s.player===p);return ps.length?(ps.reduce((a,s)=>a+parseInt(s.summary?.['Total eventos']||0),0)/ps.length).toFixed(0):0});
-  const training=await dbAll('training');
-  const avgSrpe=allPlayers.map(p=>{const pt=training.filter(t=>t.player===p);return pt.length?(pt.reduce((a,t)=>a+(t.srpe||0),0)/pt.length).toFixed(0):0});
 
   const chartsDiv=document.createElement('div');
   chartsDiv.className='team-charts';
   chartsDiv.innerHTML=`
     <div class="tc-card"><div class="sh">Player Load medio por sesión</div><canvas id="tc-load" height="160"></canvas></div>
-    <div class="tc-card"><div class="sh">Sesiones registradas</div><canvas id="tc-sess" height="160"></canvas></div>
-    <div class="tc-card"><div class="sh">Eventos totales (media/sesión)</div><canvas id="tc-ev" height="160"></canvas></div>
-    <div class="tc-card"><div class="sh">sRPE medio (entrenamiento)</div><canvas id="tc-srpe" height="160"></canvas></div>`;
+    <div class="tc-card"><div class="sh">Sesiones registradas</div><canvas id="tc-sess" height="160"></canvas></div>`;
   el.appendChild(chartsDiv);
 
   const COLORS=['#f97316','#22c55e','#3b82f6','#a855f7','#eab308','#ef4444','#06b6d4','#ec4899'];
@@ -1795,22 +1717,14 @@ async function renderTeamCharts(allPlayers, sessions){
   setTimeout(()=>{
     mkBar('tc-load',avgLoads,'Load medio');
     mkBar('tc-sess',sessionCounts,'Sesiones');
-    mkBar('tc-ev',avgEvents,'Eventos/sesión');
-    mkBar('tc-srpe',avgSrpe,'sRPE medio');
   },0);
 }
 
 async function viewPlayerDash(player){
   const sessions=(await dbAll('sessions')).filter(s=>s.player===player).sort((a,b)=>new Date(b.sessionDate||b.date)-new Date(a.sessionDate||a.date));
-  const training=(await dbAll('training')).filter(t=>t.player===player).sort((a,b)=>b.date.localeCompare(a.date));
-  const wellness=(await dbAll('wellness')).filter(w=>w.player===player).sort((a,b)=>b.date.localeCompare(a.date));
-  const injuries=(await dbAll('injuries')).filter(i=>i.player===player).sort((a,b)=>b.date.localeCompare(a.date));
   const p=S.profiles[player]||{};
-  const lastInj=injuries[0];
   const avgLoad=sessions.length?(sessions.reduce((a,s)=>a+parseFloat(s.summary?.['Player Load']||0),0)/sessions.length).toFixed(1):'—';
-  const wellTotal=wellness.length?(wellness[0].sleep+wellness[0].fatigue+wellness[0].soreness+wellness[0].stress+wellness[0].mood):null;
-  const avgSrpe=training.length?(training.reduce((a,t)=>a+(t.srpe||0),0)/training.length).toFixed(0):'—';
-  const TYPE_LBL={gym:'Gimnasio',field:'Pista',match:'Partido',other:'Otro'};
+  const totalEvents=sessions.length?(sessions.reduce((a,s)=>a+parseInt(s.summary?.['Total eventos']||0),0)):0;
 
   document.getElementById('equipo-team-view').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
@@ -1818,437 +1732,20 @@ async function viewPlayerDash(player){
       <div class="av" style="width:36px;height:36px;font-size:14px">${player[0].toUpperCase()}</div>
       <div>
         <div style="font-size:16px;font-weight:700">${player}</div>
-        <div style="font-size:11px;color:var(--mut)">${p.posicion||''} · ${p.peso||'—'} kg${p.notas?' · '+p.notas:''}</div>
+        <div style="font-size:11px;color:var(--mut)">${p.posicion||''}${p.equipo?' · '+p.equipo:''} · ${p.peso||'—'} kg${p.notas?' · '+p.notas:''}</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-      ${[['Sesiones IMU',sessions.length,'#2563eb'],['Load medio',avgLoad,'#16a34a'],['Bienestar',wellTotal!==null?wellTotal+'/25':'—','#9333ea'],['sRPE medio',avgSrpe,'#d97706']].map(([l,v,c])=>`<div class="mc"><div class="ml">${l}</div><div class="mv" style="color:${c}">${v}</div></div>`).join('')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      ${[['Sesiones IMU',sessions.length,'#2563eb'],['Load medio',avgLoad,'#16a34a'],['Total eventos',totalEvents,'#d97706']].map(([l,v,c])=>`<div class="mc"><div class="ml">${l}</div><div class="mv" style="color:${c}">${v}</div></div>`).join('')}
     </div>
-    <div class="g2">
-      <div>
-        <div class="card">
-          <div class="sh">Sesiones IMU (${sessions.length})</div>
-          ${sessions.length?sessions.slice(0,10).map(s=>{const sd=new Date(s.sessionDate||s.date);return`<div class="sc" style="padding:8px 10px;cursor:pointer;margin-bottom:4px" onclick="viewStoredSession_hist(${s.id})">
-            <div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:700">${sd.getDate()}</div><div style="font-size:9px;color:var(--mut)">${sd.toLocaleString('es-ES',{month:'short'})}</div></div>
-            <div style="flex:1"><div style="font-size:11px;font-weight:600">${s.summary?.['Duración']||'—'}</div><div style="font-size:10px;color:var(--mut)">Load: ${s.summary?.['Player Load']||'—'} · ${s.summary?.['Total eventos']||'—'} eventos</div></div>
-            <span style="font-size:10px;color:var(--acc)">👁</span>
-          </div>`}).join(''):'<p style="color:var(--mut);font-size:11px">Sin sesiones.</p>'}
-        </div>
-        <div class="card">
-          <div class="sh">Lesiones (${injuries.length})</div>
-          ${injuries.length?`<div style="text-align:center;margin-bottom:8px">${bodyMapSVG(injuries,'',false)}</div>`:''}
-          ${injuries.length?injuries.map(i=>`<div class="sc" style="padding:7px 10px;margin-bottom:4px">
-            <span class="badge ${i.status==='ok'?'inj-ok':i.status==='watch'?'inj-watch':'inj-out'}">${i.status==='ok'?'OK':i.status==='watch'?'Seguimiento':'Baja'}</span>
-            <div style="flex:1"><div style="font-size:11px;font-weight:600">${i.location}</div><div style="font-size:10px;color:var(--mut)">${i.date}${i.notes?' · '+i.notes:''}</div></div>
-            <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delInjury(${i.id});viewPlayerDash('${player.replace(/'/g,"\\'")}')">✕</button>
-          </div>`).join(''):'<p style="color:var(--mut);font-size:11px">Sin registros.</p>'}
-        </div>
-      </div>
-      <div>
-        <div class="card">
-          <div class="sh">Entrenamientos (${training.length})</div>
-          ${training.length?training.slice(0,8).map(t=>`<div style="border-bottom:1px solid var(--brd);padding:7px 0">
-            <div style="display:flex;justify-content:space-between"><span style="font-size:11px;font-weight:600">${t.date} · ${TYPE_LBL[t.type]||t.type}</span><span style="font-size:11px;color:var(--acc);font-weight:700">sRPE ${t.srpe}</span></div>
-            <div style="font-size:10px;color:var(--mut)">${t.effectiveTime}min · RPE ${t.rpe}/10 · Coef ${t.intensityCoeff}${t.notes?' · '+t.notes:''}</div>
-          </div>`).join(''):'<p style="color:var(--mut);font-size:11px">Sin registros.</p>'}
-        </div>
-        <div class="card">
-          <div class="sh">Bienestar reciente</div>
-          ${wellness.length?wellness.slice(0,6).map(w=>{const tot=w.sleep+w.fatigue+w.soreness+w.stress+w.mood;const col=tot>=20?'var(--green)':tot>=13?'var(--yel)':'var(--red)';return`<div style="border-bottom:1px solid var(--brd);padding:7px 0;display:flex;align-items:center;gap:8px">
-            <div style="font-size:11px;color:var(--mut);min-width:70px">${w.date}</div>
-            <div style="flex:1;height:5px;background:var(--surf2);border-radius:3px;overflow:hidden"><div style="width:${Math.round(tot/25*100)}%;height:100%;background:${col}"></div></div>
-            <div style="font-size:12px;font-weight:700;color:${col}">${tot}/25</div>
-          </div>`}).join(''):'<p style="color:var(--mut);font-size:11px">Sin registros.</p>'}
-        </div>
-      </div>
-    </div>`;
-}
-
-// ═══════════════════════════════════════════════════════
-// MÉTRICAS — TRAINING LOG
-// ═══════════════════════════════════════════════════════
-let _trRpe=5;
-const _wellVals={sleep:3,fatigue:3,soreness:3,stress:3,mood:3,flow:1,cycle_pain:1};
-
-function metTab(tab,el){
-  document.querySelectorAll('#page-metricas .tab').forEach(t=>t.classList.remove('on'));
-  document.querySelectorAll('#page-metricas .tab-content').forEach(t=>t.classList.remove('on'));
-  el.classList.add('on');
-  document.getElementById('mt-'+tab).classList.add('on');
-  if(tab==='entrenamiento')renderTrainingHistory();
-  else if(tab==='bienestar'){buildWellnessButtons();renderWellnessHistory()}
-  else if(tab==='lesiones')renderInjuryHistory();
-  else if(tab==='cycle'){buildWellnessButtons();renderCycleHistory()}
-}
-
-function renderMetricas(){
-  const players=Object.keys(S.profiles);
-  const sel=document.getElementById('metricas-player');
-  if(sel){const cur=sel.value;sel.innerHTML='<option value="">— Todos —</option>'+players.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('')}
-  const today=new Date().toISOString().slice(0,10);
-  ['tr-date','well-date','inj-date'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=today});
-  buildRpeButtons();
-  buildWellnessButtons();
-  renderTrainingHistory();
-  // Init body map for injury form
-  const bm=document.getElementById('inj-body-map');
-  if(bm&&!bm.innerHTML)bm.innerHTML=bodyMapSVG([],_selBodyZone,true);
-  buildInjPainButtons();
-  // Build wellness flow/cycle pain buttons
-  const fc=document.getElementById('wr-flow');if(fc&&!fc.children.length)buildWellnessButtons();
-  // Show/hide cycle tab based on player gender
-  const selP=document.getElementById('metricas-player')?.value;
-  const genderIsFemale=selP&&S.profiles[selP]?.genero==='F';
-  const cycleTab=document.getElementById('tab-cycle');
-  if(cycleTab)cycleTab.style.display=genderIsFemale?'':'none';
-  const cycleSection=document.getElementById('mt-cycle-section');
-  if(cycleSection)cycleSection.style.display=genderIsFemale?'':'none';
-}
-
-function onMetricasPlayer(){
-  renderTrainingHistory();renderWellnessHistory();renderInjuryHistory();
-  const selP=document.getElementById('metricas-player')?.value;
-  const isFemale=selP&&S.profiles[selP]?.genero==='F';
-  const cycleTab=document.getElementById('tab-cycle');if(cycleTab)cycleTab.style.display=isFemale?'':'none';
-  const cycleSection=document.getElementById('mt-cycle-section');if(cycleSection)cycleSection.style.display=isFemale?'':'none';
-}
-
-function buildRpeButtons(){
-  const el=document.getElementById('tr-rpe-btns');if(!el)return;
-  el.innerHTML=[...Array(11)].map((_,i)=>`<button class="wr-btn${i===_trRpe?' on':''}" onclick="setRpe(${i})">${i}</button>`).join('');
-  updateSrpe();
-}
-
-function setRpe(v){_trRpe=v;buildRpeButtons()}
-
-function updateSrpe(){
-  const time=parseFloat(document.getElementById('tr-time')?.value||60);
-  const coeff=parseFloat(document.getElementById('tr-coeff')?.value||1);
-  const srpe=Math.round(_trRpe*time*coeff);
-  const el=document.getElementById('tr-srpe');if(el)el.textContent=srpe;
-  return srpe;
-}
-
-async function saveTraining(){
-  const player=document.getElementById('metricas-player')?.value;
-  if(!player){toast('Selecciona un jugador','e');return}
-  const date=document.getElementById('tr-date').value;
-  if(!date){toast('Selecciona fecha','e');return}
-  const type=document.getElementById('tr-type').value;
-  const effectiveTime=parseFloat(document.getElementById('tr-time').value)||0;
-  const intensityCoeff=parseFloat(document.getElementById('tr-coeff').value)||1;
-  const rpe=_trRpe;const srpe=updateSrpe();
-  const notes=document.getElementById('tr-notes').value;
-  await dbPut('training',{id:Date.now(),player,date,type,effectiveTime,intensityCoeff,rpe,srpe,notes});
-  toast('Entrenamiento guardado','s');renderTrainingHistory();
-}
-
-async function renderTrainingHistory(){
-  const el=document.getElementById('tr-history');if(!el)return;
-  const player=document.getElementById('metricas-player')?.value;
-  const all=await dbAll('training');
-  const rows=(player?all.filter(t=>t.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
-  const TYPE_LBL={gym:'🏋️ Gimnasio',field:'🏀 Pista',match:'🏆 Partido',other:'📝 Otro'};
-  if(!rows.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';return}
-  el.innerHTML=rows.map(t=>`
-    <div style="border-bottom:1px solid var(--brd);padding:8px 0;display:flex;align-items:start;gap:8px">
-      <div style="flex:1">
-        <div style="font-size:11px;font-weight:600">${t.date} · ${TYPE_LBL[t.type]||t.type}${!player&&t.player?' · '+t.player:''}</div>
-        <div style="font-size:10px;color:var(--mut)">${t.effectiveTime}min · RPE ${t.rpe}/10 · Coef. ${t.intensityCoeff}</div>
-        <div style="font-size:13px;color:var(--acc);font-weight:700">sRPE: ${t.srpe}</div>
-        ${t.notes?`<div style="font-size:10px;color:var(--mut)">${t.notes}</div>`:''}
-      </div>
-      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delTraining(${t.id})">✕</button>
-    </div>`).join('');
-}
-async function delTraining(id){await dbDel('training',id);renderTrainingHistory();toast('Eliminado','s')}
-
-// ── Wellness ──────────────────────────────────────────
-function buildWellnessButtons(){
-  const dims=['sleep','fatigue','soreness','stress','mood'];
-  dims.forEach(dim=>{
-    const el=document.getElementById('wr-'+dim);if(!el)return;
-    el.innerHTML=[...Array(5)].map((_,i)=>{const v=i+1;return`<button class="wr-btn${_wellVals[dim]===v?' on':''}" onclick="setWell('${dim}',${v})">${v}</button>`}).join('');
-  });
-  // Cycle-specific buttons
-  ['flow','cycle-pain'].forEach(dim=>{
-    const key=dim.replace('-','_');
-    const el=document.getElementById('wr-'+dim);if(!el)return;
-    el.innerHTML=[...Array(5)].map((_,i)=>{const v=i+1;return`<button class="wr-btn${(_wellVals[key]||1)===v?' on':''}" onclick="setWell('${key}',${v})">${v}</button>`}).join('');
-  });
-  updateWellTotal();
-}
-
-function setWell(dim,val){_wellVals[dim]=val;buildWellnessButtons()}
-
-function updateWellTotal(){
-  const total=Object.values(_wellVals).reduce((a,v)=>a+v,0);
-  const col=total>=20?'var(--green)':total>=13?'var(--yel)':'var(--red)';
-  const el=document.getElementById('well-total');if(el){el.textContent=total;el.style.color=col}
-}
-
-async function saveWellness(){
-  const player=document.getElementById('metricas-player')?.value;
-  if(!player){toast('Selecciona un jugador','e');return}
-  const date=document.getElementById('well-date').value;
-  if(!date){toast('Selecciona fecha','e');return}
-  await dbPut('wellness',{id:Date.now(),player,date,..._wellVals});
-  toast('Bienestar guardado','s');renderWellnessHistory();
-}
-
-async function renderWellnessHistory(){
-  const el=document.getElementById('well-history');if(!el)return;
-  const player=document.getElementById('metricas-player')?.value;
-  const all=await dbAll('wellness');
-  const rows=(player?all.filter(w=>w.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
-  if(!rows.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';return}
-  el.innerHTML=rows.map(w=>{
-    const tot=w.sleep+w.fatigue+w.soreness+w.stress+w.mood;
-    const col=tot>=20?'var(--green)':tot>=13?'var(--yel)':'var(--red)';
-    return`<div style="border-bottom:1px solid var(--brd);padding:8px 0;display:flex;align-items:center;gap:8px">
-      <div style="flex:1">
-        <div style="font-size:11px;font-weight:600">${w.date}${!player&&w.player?' · '+w.player:''}</div>
-        <div style="font-size:10px;color:var(--mut)">Sueño:${w.sleep} Fatiga:${w.fatigue} Dolor:${w.soreness} Estrés:${w.stress} Ánimo:${w.mood}</div>
-      </div>
-      <div style="font-size:14px;font-weight:700;color:${col}">${tot}/25</div>
-      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delWellness(${w.id})">✕</button>
-    </div>`;
-  }).join('');
-}
-async function delWellness(id){await dbDel('wellness',id);renderWellnessHistory();toast('Eliminado','s')}
-
-async function saveCycle(){
-  const player=document.getElementById('metricas-player')?.value;
-  if(!player){toast('Selecciona un jugador','e');return}
-  const date=document.getElementById('well-date').value||new Date().toISOString().slice(0,10);
-  const cycleDay=parseInt(document.getElementById('cycle-day')?.value)||1;
-  const flow=_wellVals.flow||1;
-  const pain=_wellVals.cycle_pain||1;
-  const notes=document.getElementById('cycle-notes')?.value||'';
-  await dbPut('menstrual',{id:Date.now(),player,date,cycleDay,flow,pain,notes});
-  toast('Ciclo guardado','s');renderCycleHistory();
-}
-
-async function renderCycleHistory(){
-  const hel=document.getElementById('cycle-history');
-  const sel=document.getElementById('cycle-summary');
-  if(!hel)return;
-  const player=document.getElementById('metricas-player')?.value;
-  const all=await dbAll('menstrual');
-  const rows=(player?all.filter(r=>r.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
-  if(!rows.length){hel.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';if(sel)sel.innerHTML='<p style="color:var(--mut);font-size:11px">Sin datos.</p>';return}
-
-  hel.innerHTML=rows.map(r=>`
-    <div style="border-bottom:1px solid var(--brd);padding:7px 0;display:flex;align-items:center;gap:8px">
-      <div style="flex:1">
-        <div style="font-size:11px;font-weight:600">${r.date} · Día ${r.cycleDay}</div>
-        <div style="font-size:10px;color:var(--mut)">Flujo: ${r.flow}/5 · Dolor: ${r.pain}/5${r.notes?' · '+r.notes:''}</div>
-      </div>
-      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delCycle(${r.id})">✕</button>
-    </div>`).join('');
-
-  // Summary
-  if(sel){
-    const periods=rows.filter(r=>r.cycleDay===1).sort((a,b)=>a.date.localeCompare(b.date));
-    let avgCycleLen='—';
-    if(periods.length>=2){const diffs=[];for(let i=1;i<periods.length;i++){const d=(new Date(periods[i].date)-new Date(periods[i-1].date))/(1000*86400);diffs.push(d)}avgCycleLen=Math.round(diffs.reduce((a,v)=>a+v,0)/diffs.length)+'d'}
-    const avgPain=(rows.reduce((a,r)=>a+r.pain,0)/rows.length).toFixed(1);
-    sel.innerHTML=`
-      <div class="mc" style="margin-bottom:8px"><div class="ml">Ciclos registrados</div><div class="mv" style="color:var(--pur)">${periods.length}</div></div>
-      <div class="mc" style="margin-bottom:8px"><div class="ml">Duración media</div><div class="mv" style="color:var(--blue)">${avgCycleLen}</div></div>
-      <div class="mc"><div class="ml">Dolor medio</div><div class="mv" style="color:var(--red)">${avgPain}/5</div></div>`;
-  }
-}
-async function delCycle(id){await dbDel('menstrual',id);renderCycleHistory();toast('Eliminado','s')}
-
-// ── Injuries ──────────────────────────────────────────
-async function saveInjury(){
-  const player=document.getElementById('metricas-player')?.value;
-  if(!player){toast('Selecciona un jugador','e');return}
-  const location=document.getElementById('inj-location').value.trim();
-  if(!location){toast('Introduce localización','e');return}
-  const date=document.getElementById('inj-date').value||new Date().toISOString().slice(0,10);
-  const status=document.getElementById('inj-status').value;
-  const notes=document.getElementById('inj-notes').value;
-  await dbPut('injuries',{id:Date.now(),player,date,location,zone_id:_selBodyZone||'',status,pain:_injPain,notes});
-  _selBodyZone='';_injPain=0;buildInjPainButtons();
-  const mapEl=document.getElementById('inj-body-map');if(mapEl)mapEl.innerHTML=bodyMapSVG([],_selBodyZone,true);
-  toast('Lesión guardada','s');renderInjuryHistory();
-}
-
-async function renderInjuryHistory(){
-  const el=document.getElementById('inj-history');if(!el)return;
-  const player=document.getElementById('metricas-player')?.value;
-  const all=await dbAll('injuries');
-  const rows=(player?all.filter(i=>i.player===player):all).sort((a,b)=>b.date.localeCompare(a.date));
-  if(!rows.length){el.innerHTML='<p style="color:var(--mut);font-size:11px">Sin registros.</p>';return}
-  el.innerHTML=rows.map(i=>`
-    <div class="sc" style="padding:8px 10px;margin-bottom:4px">
-      <span class="badge ${i.status==='ok'?'inj-ok':i.status==='watch'?'inj-watch':'inj-out'}">${i.status==='ok'?'OK':i.status==='watch'?'Seguimiento':'Baja'}</span>
-      <div style="flex:1">
-        <div style="font-size:11px;font-weight:600">${i.location}${!player&&i.player?' · '+i.player:''}</div>
-        <div style="font-size:10px;color:var(--mut)">${i.date}${i.zone_id?' · '+i.location:''}${i.pain>0?' · Dolor: '+i.pain+'/10':''}${i.notes?' · '+i.notes:''}</div>
-      </div>
-      <button class="btn bd" style="padding:2px 6px;font-size:10px" onclick="delInjury(${i.id})">✕</button>
-    </div>`).join('');
-}
-async function delInjury(id){await dbDel('injuries',id);renderInjuryHistory();toast('Eliminado','s')}
-
-// ═══════════════════════════════════════════════════════
-// FEB PDF IMPORT
-// ═══════════════════════════════════════════════════════
-async function handleFEBPdf(file){
-  if(!file)return;
-  document.getElementById('feb-pdf-name').textContent=file.name;
-  const statusEl=document.getElementById('feb-status');
-  const tableEl=document.getElementById('feb-table');
-  statusEl.innerHTML='<div class="al ai">⏳ Procesando PDF...</div>';
-  tableEl.innerHTML='';
-
-  try{
-    if(typeof pdfjsLib==='undefined')throw new Error('PDF.js no cargado');
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const ab=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
-
-    // Extract all text items with positions from all pages
-    let textBlocks=[];
-    for(let p=1;p<=pdf.numPages;p++){
-      const page=await pdf.getPage(p);
-      const content=await page.getTextContent();
-      for(const item of content.items){
-        if(item.str.trim())textBlocks.push({str:item.str.trim(),x:item.transform[4],y:item.transform[5],page:p});
-      }
-    }
-
-    // Normalize text for matching
-    const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9\s]/g,'');
-    const players=Object.keys(S.profiles);
-
-    // Try to find player names in text (partial match on last name or full name)
-    const found=[];
-    for(const player of players){
-      const parts=norm(player).split(/\s+/);
-      // Check each text block for any significant part of the name
-      const lastName=parts[parts.length-1];
-      if(lastName.length<3)continue;
-      const matchIdx=textBlocks.findIndex(b=>norm(b.str).includes(lastName)||(parts.length>1&&norm(b.str).includes(parts[0])));
-      if(matchIdx>=0){
-        // Collect nearby numbers (same row ±5px y, or next few blocks)
-        const refY=textBlocks[matchIdx].y;
-        const rowBlocks=textBlocks.filter((b,i)=>Math.abs(b.y-refY)<6).sort((a,bb)=>a.x-bb.x);
-        const nums=rowBlocks.map(b=>b.str).filter(s=>/^\d+$/.test(s)).map(Number);
-        found.push({player,nums,rawRow:rowBlocks.map(b=>b.str).join(' ')});
-      }
-    }
-
-    if(!found.length){
-      statusEl.innerHTML='<div class="al aw">⚠️ No se detectaron jugadores del equipo. Revisa que los nombres del perfil coincidan con el PDF, o usa entrada manual.</div>';
-      showFEBManual();return;
-    }
-
-    statusEl.innerHTML=`<div class="al as">✅ ${found.length} jugador(es) detectado(s). Revisa y ajusta.</div>`;
-    _febPlayers=found.map(f=>({player:f.player,k:f.player.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'')}));
-
-    // Build editable table
-    const date=new Date().toISOString().slice(0,10);
-    tableEl.innerHTML=`
-      <div class="card">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-          <div><label class="lbl">Fecha</label><input type="date" id="feb-date" value="${date}"></div>
-          <div><label class="lbl">Rival</label><input id="feb-rival" placeholder="Equipo rival"></div>
-        </div>
-        <div class="tw">
-          <table><thead><tr><th>Jugador</th><th>PTS</th><th>REB</th><th>AST</th><th>MIN</th><th>+/-</th><th>VAL</th></tr></thead>
-          <tbody>${found.map((f,i)=>{
-            const[pts=0,reb=0,ast=0,min=0,pm=0,val=0]=f.nums;
-            const k=f.player.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
-            return`<tr>
-              <td style="font-weight:600">${f.player}</td>
-              ${['pts','reb','ast','min','pm','val'].map((s,si)=>`<td><input type="number" id="feb-${s}-${k}" value="${[pts,reb,ast,min,pm,val][si]||0}" style="width:52px;padding:3px 5px"></td>`).join('')}
-            </tr>`;
-          }).join('')}</tbody></table>
-        </div>
-        <button class="btn bp" style="margin-top:10px" onclick="saveFEBStoredPlayers()">💾 Guardar estadísticas</button>
-      </div>`;
-  }catch(e){
-    statusEl.innerHTML=`<div class="al aw">⚠️ Error al leer PDF: ${e.message}. Usa entrada manual.</div>`;
-    showFEBManual();
-  }
-}
-
-async function saveFEBStoredPlayers(){await saveFEBFromTable(_febPlayers);}
-async function saveFEBFromTable(players){
-  const date=document.getElementById('feb-date')?.value||new Date().toISOString().slice(0,10);
-  const rival=document.getElementById('feb-rival')?.value.trim()||'Desconocido';
-  let saved=0;
-  for(const{player,k}of players){
-    const g=stat=>parseInt(document.getElementById(`feb-${stat}-${k}`)?.value)||0;
-    await dbPut('game_stats',{id:Date.now()+Math.random(),player,date,rival,pts:g('pts'),reb:g('reb'),ast:g('ast'),min:g('min'),pm:g('pm'),val:g('val')});
-    saved++;
-  }
-  toast(`${saved} jugadores guardados`,'s');
-}
-
-function showFEBManual(){
-  const players=Object.keys(S.profiles);
-  _febPlayers=players.map(p=>({player:p,k:p.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'')}));
-  document.getElementById('feb-table').innerHTML=`
     <div class="card">
-      <div class="sh">Entrada manual</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div><label class="lbl">Fecha</label><input type="date" id="feb-date" value="${new Date().toISOString().slice(0,10)}"></div>
-        <div><label class="lbl">Rival</label><input id="feb-rival" placeholder="Equipo rival"></div>
-      </div>
-      ${players.map(p=>{const k=p.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'');return`
-        <div style="border-top:1px solid var(--brd);padding:8px 0;margin-top:6px">
-          <div style="font-weight:600;font-size:12px;margin-bottom:6px">${p}</div>
-          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
-            ${['pts','reb','ast','min','pm','val'].map(s=>`<div><label class="lbl">${s.toUpperCase()}</label><input type="number" id="feb-${s}-${k}" value="0" min="0" style="padding:4px 6px"></div>`).join('')}
-          </div>
-        </div>`}).join('')}
-      ${players.length?`<button class="btn bp bw" style="margin-top:12px" onclick="saveFEBStoredPlayers()">💾 Guardar</button>`:'<p style="color:var(--mut);font-size:11px">Crea perfiles primero.</p>'}
+      <div class="sh">Sesiones IMU (${sessions.length})</div>
+      ${sessions.length?sessions.map(s=>{const sd=new Date(s.sessionDate||s.date);return`<div class="sc" style="padding:8px 10px;cursor:pointer;margin-bottom:4px" onclick="viewStoredSession_hist(${s.id})">
+        <div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:700">${sd.getDate()}</div><div style="font-size:9px;color:var(--mut)">${sd.toLocaleString('es-ES',{month:'short'})}</div><div style="font-size:9px;color:var(--mut)">${sd.getFullYear()}</div></div>
+        <div style="flex:1"><div style="font-size:11px;font-weight:600">${s.summary?.['Duración']||'—'}</div><div style="font-size:10px;color:var(--mut)">Load: ${s.summary?.['Player Load']||'—'} · ${s.summary?.['Total eventos']||'—'} eventos</div></div>
+        <span style="font-size:10px;color:var(--acc)">👁</span>
+      </div>`}).join(''):'<p style="color:var(--mut);font-size:11px">Sin sesiones.</p>'}
     </div>`;
-}
-
-// ═══════════════════════════════════════════════════════
-// MCP INTEGRATION
-// ═══════════════════════════════════════════════════════
-async function mcpSave(){
-  const url=document.getElementById('mcp-url').value.trim();
-  const token=document.getElementById('mcp-token').value.trim();
-  await dbPut('cfg',{k:'mcp',v:{url,token}});
-  toast('Configuración MCP guardada','s');
-}
-
-async function mcpPush(){
-  const cfgRec=await dbGet('cfg','mcp');
-  const cfg=cfgRec?.v;
-  if(!cfg?.url){toast('Configura el endpoint primero','e');return}
-  const statusEl=document.getElementById('mcp-status');
-  statusEl.innerHTML='<div class="al ai">⏳ Enviando datos...</div>';
-
-  const payload={};
-  if(document.getElementById('mcp-imu').checked)payload.sessions=await dbAll('sessions');
-  if(document.getElementById('mcp-training').checked)payload.training=await dbAll('training');
-  if(document.getElementById('mcp-wellness').checked)payload.wellness=await dbAll('wellness');
-  if(document.getElementById('mcp-injuries').checked)payload.injuries=await dbAll('injuries');
-  if(document.getElementById('mcp-game').checked)payload.game_stats=await dbAll('game_stats');
-
-  const counts=Object.entries(payload).map(([k,v])=>`${k}:${v.length}`).join(' ');
-  try{
-    const resp=await fetch(cfg.url,{
-      method:'POST',
-      headers:{'Content-Type':'application/json',...(cfg.token?{'Authorization':'Bearer '+cfg.token}:{})},
-      body:JSON.stringify({source:'redline-imu',timestamp:new Date().toISOString(),data:payload}),
-    });
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    statusEl.innerHTML=`<div class="al as">✅ Datos enviados — ${counts}</div>`;
-    toast('Datos enviados al MCP','s');
-  }catch(e){
-    statusEl.innerHTML=`<div class="al aw">❌ Error: ${e.message}</div>`;
-    toast('Error al enviar: '+e.message,'e');
-  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2264,7 +1761,6 @@ async function init(){
   dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');handleFile(e.dataTransfer.files[0])});
   document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on')}));
   try{const cfg=await dbGet('cfg','dir');if(cfg?.v){const p=await cfg.v.queryPermission({mode:'readwrite'});if(p==='granted'||p==='prompt'){S.dirHandle=cfg.v;setFolderUI(cfg.v.name)}}}catch{}
-  try{const m=await dbGet('cfg','mcp');if(m?.v){const u=document.getElementById('mcp-url');const t=document.getElementById('mcp-token');if(u)u.value=m.v.url||'';if(t)t.value=m.v.token||''}}catch{}
 }
 
 init();
