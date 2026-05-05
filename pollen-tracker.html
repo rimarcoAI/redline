@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polen Mallorca · Control de Síntomas</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #0f1628;
+    --bg3: #151e35;
+    --card: rgba(255,255,255,0.04);
+    --card-border: rgba(255,255,255,0.08);
+    --card-hover: rgba(255,255,255,0.07);
+    --text: #e8eaf6;
+    --text-muted: #7986a8;
+    --text-dim: #4a5578;
+    --accent: #38bdf8;
+    --accent2: #818cf8;
+    --lvl-none:     #374151;
+    --lvl-vlow:     #059669;
+    --lvl-low:      #10b981;
+    --lvl-mid:      #f59e0b;
+    --lvl-high:     #f97316;
+    --lvl-vhigh:    #ef4444;
+    --lvl-extreme:  #7c3aed;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --r: 14px;
+    --r-sm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── Background orbs ─── */
+  body::before, body::after {
+    content: '';
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: .18;
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::before { width: 600px; height: 600px; background: radial-gradient(circle, #0ea5e9, transparent); top: -200px; right: -200px; }
+  body::after  { width: 500px; height: 500px; background: radial-gradient(circle, #818cf8, transparent); bottom: -150px; left: -150px; }
+
+  /* ─── Layout ─── */
+  .app-shell { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 16px 80px; }
+
+  /* ─── Header ─── */
+  .app-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 0 0;
+    border-bottom: 1px solid var(--card-border);
+    margin-bottom: 0;
+  }
+  .app-logo { display: flex; align-items: center; gap: 12px; }
+  .app-logo .logo-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, #0ea5e9, #818cf8);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .app-logo h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.5px; }
+  .app-logo p  { font-size: .75rem; color: var(--text-muted); margin-top: 1px; }
+  .header-status { text-align: right; font-size: .75rem; color: var(--text-muted); line-height: 1.6; }
+  .header-status span { display: block; }
+  #header-last-update { color: var(--accent); font-weight: 500; }
+
+  /* ─── Tab nav ─── */
+  .tab-nav {
+    display: flex; gap: 4px;
+    padding: 20px 0 0;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .tab-btn {
+    padding: 10px 22px; border: none; background: none; cursor: pointer;
+    color: var(--text-muted); font-size: .9rem; font-weight: 500; font-family: inherit;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: all .2s; border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 8px;
+  }
+  .tab-btn:hover { color: var(--text); background: var(--card); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(56,189,248,.06); }
+  .tab-btn .tab-icon { font-size: 1.1rem; }
+
+  /* ─── Tab content ─── */
+  .tab-panel { display: none; padding-top: 28px; animation: fadeIn .3s ease; }
+  .tab-panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ─── Section titles ─── */
+  .section-title {
+    font-size: .7rem; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-dim);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--card-border); }
+
+  /* ─── Status banner ─── */
+  .status-banner {
+    display: flex; align-items: center; gap: 20px;
+    padding: 20px 24px; border-radius: var(--r);
+    background: var(--card); border: 1px solid var(--card-border);
+    margin-bottom: 24px; backdrop-filter: blur(20px);
+  }
+  .status-indicator {
+    width: 64px; height: 64px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; flex-shrink: 0;
+    box-shadow: 0 0 30px currentColor;
+  }
+  .status-banner .info { flex: 1; }
+  .status-banner .info h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
+  .status-banner .info p  { font-size: .85rem; color: var(--text-muted); }
+  .station-badge {
+    padding: 6px 14px; border-radius: 20px;
+    background: rgba(56,189,248,.12); border: 1px solid rgba(56,189,248,.3);
+    color: var(--accent); font-size: .78rem; font-weight: 600; white-space: nowrap;
+  }
+  .update-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 24px; font-size: .82rem; color: var(--text-muted);
+  }
+  .update-row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  .refresh-btn {
+    margin-left: auto; padding: 5px 14px; border-radius: 20px;
+    background: var(--card); border: 1px solid var(--card-border);
+    color: var(--text-muted); font-size: .78rem; cursor: pointer; font-family: inherit;
+    transition: all .2s; display: flex; align-items: center; gap: 6px;
+  }
+  .refresh-btn:hover { background: var(--card-hover); color: var(--text); }
+
+  /* ─── Pollen grid ─── */
+  .pollen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 32px;
+  }
+  .pollen-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--r); padding: 16px;
+    cursor: default; transition: all .2s;
+    position: relative; overflow: hidden;
+  }
+  .pollen-card:hover { background: var(--card-hover); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+  .pollen-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    border-radius: var(--r) var(--r) 0 0;
+    background: var(--lvl-color, var(--text-dim));
+  }
+  .pollen-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .pollen-icon { font-size: 1.6rem; }
+  .pollen-trend { font-size: 1.2rem; }
+  .pollen-name { font-size: .88rem; font-weight: 600; color: var(--text); margin-bottom: 6px; line-height: 1.3; }
+  .pollen-type-label { font-size: .68rem; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .8px; }
+  .level-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    background: rgba(255,255,255,.06);
+  }
+  .level-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .pollen-bar-wrap { margin-top: 10px; height: 4px; background: rgba(255,255,255,.06); border-radius: 2px; overflow: hidden; }
+  .pollen-bar { height: 100%; border-radius: 2px; transition: width .8s ease; }
+  .pollen-date { font-size: .68rem; color: var(--text-dim); margin-top: 6px; }
+
+  /* ─── Loading/error states ─── */
+  .api-message {
+    padding: 40px; text-align: center;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r);
+  }
+  .api-message .icon { font-size: 3rem; margin-bottom: 12px; }
+  .api-message h3 { font-size: 1.1rem; margin-bottom: 8px; }
+  .api-message p  { color: var(--text-muted); font-size: .85rem; line-height: 1.6; }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--card-border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Forecast chart section ─── */
+  .chart-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--r); padding: 24px; margin-bottom: 24px;
+  }
+  .chart-card h3 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; }
+  .chart-card .sub { font-size: .78rem; color: var(--text-muted); margin-bottom: 20px; }
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ─── Attribution ─── */
+  .attribution {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 16px 20px; border-radius: var(--r-sm);
+    background: rgba(255,255,255,.02); border: 1px solid var(--card-border);
+    font-size: .75rem; color: var(--text-dim); margin-bottom: 8px;
+  }
+  .attribution a { color: var(--accent); text-decoration: none; }
+  .attribution a:hover { text-decoration: underline; }
+  .cc-badge { padding: 2px 8px; background: rgba(56,189,248,.1); border-radius: 4px; color: var(--accent); font-weight: 600; }
+
+  /* ───────────────────── SYMPTOMS TAB ───────────────────── */
+  .q-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px; margin-bottom: 32px;
+  }
+  .q-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--r); padding: 22px 20px; cursor: pointer; transition: all .2s;
+    position: relative; overflow: hidden;
+  }
+  .q-card:hover { background: var(--card-hover); transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,.4); border-color: rgba(255,255,255,.14); }
+  .q-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    border-radius: var(--r) var(--r) 0 0; background: var(--q-color);
+  }
+  .q-card .q-icon { font-size: 2rem; margin-bottom: 12px; }
+  .q-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: 4px; }
+  .q-card .q-abbr { font-size: .7rem; font-weight: 700; letter-spacing: 1px; color: var(--q-color); text-transform: uppercase; margin-bottom: 8px; }
+  .q-card p { font-size: .78rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; }
+  .q-card .start-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 16px; border-radius: 20px;
+    background: var(--q-color); color: #fff; font-size: .78rem;
+    font-weight: 600; font-family: inherit; border: none; cursor: pointer; transition: opacity .2s;
+  }
+  .q-card .start-btn:hover { opacity: .85; }
+  .last-score-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border); }
+  .last-score-row .ls-label { font-size: .68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .8px; }
+  .last-score-row .ls-val { font-size: 1.1rem; font-weight: 700; }
+
+  /* ─── History chart ─── */
+  .history-wrap { position: relative; height: 240px; }
+
+  /* ─── Questionnaire modal ─── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.75); backdrop-filter: blur(8px);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn .25s ease; }
+  .modal-box {
+    background: #12192e; border: 1px solid rgba(255,255,255,.12);
+    border-radius: 20px; width: 100%; max-width: 600px;
+    padding: 0; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.6);
+    animation: slideUp .3s ease;
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+  .modal-header {
+    padding: 24px 28px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  }
+  .modal-header .mh-left { flex: 1; }
+  .modal-header .q-type { font-size: .68rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 6px; }
+  .modal-header h2 { font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+  .close-btn {
+    width: 34px; height: 34px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-border);
+    color: var(--text-muted); cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all .2s;
+  }
+  .close-btn:hover { background: var(--card-hover); color: var(--text); }
+
+  /* progress */
+  .progress-area { padding: 20px 28px 0; }
+  .progress-bar-wrap { height: 5px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+  .progress-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+  .progress-label { font-size: .72rem; color: var(--text-muted); display: flex; justify-content: space-between; }
+
+  /* question */
+  .question-area { padding: 28px 28px 20px; }
+  .question-text { font-size: 1.05rem; font-weight: 600; line-height: 1.5; margin-bottom: 24px; color: var(--text); }
+  .question-context { font-size: .78rem; color: var(--text-muted); margin-bottom: 20px; padding: 10px 14px; background: rgba(255,255,255,.03); border-radius: 8px; border-left: 3px solid var(--accent); }
+  .answers-grid {
+    display: grid; gap: 8px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .answers-grid.cols-1 { grid-template-columns: 1fr; }
+  .answers-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .ans-btn {
+    padding: 14px 12px; border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,.04); border: 1.5px solid rgba(255,255,255,.08);
+    color: var(--text); font-family: inherit; font-size: .84rem; font-weight: 500;
+    text-align: center; transition: all .18s; line-height: 1.3; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .ans-btn .ans-score { font-size: .68rem; color: var(--text-dim); font-weight: 400; }
+  .ans-btn:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.2); transform: translateY(-1px); }
+  .ans-btn.selected { background: rgba(56,189,248,.15); border-color: var(--accent); color: var(--accent); }
+  .ans-btn.choosing { animation: pop .2s ease; }
+  @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(.96)} 100%{transform:scale(1)} }
+
+  /* nav */
+  .modal-footer { padding: 16px 28px 24px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--card-border); margin-top: 8px; }
+  .btn-secondary {
+    padding: 10px 20px; border-radius: 10px; background: var(--card); border: 1px solid var(--card-border);
+    color: var(--text-muted); cursor: pointer; font-family: inherit; font-size: .85rem; font-weight: 500; transition: all .2s;
+  }
+  .btn-secondary:hover { background: var(--card-hover); color: var(--text); }
+  .btn-primary {
+    padding: 10px 24px; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, #0ea5e9, #818cf8);
+    color: #fff; cursor: pointer; font-family: inherit; font-size: .85rem; font-weight: 600; transition: opacity .2s;
+  }
+  .btn-primary:hover { opacity: .9; }
+  .btn-primary:disabled { opacity: .4; cursor: default; }
+
+  /* ─── Results screen ─── */
+  .results-area { padding: 0 28px 28px; animation: fadeIn .3s ease; }
+  .results-header { text-align: center; padding: 28px 0 24px; }
+  .score-ring {
+    width: 110px; height: 110px; border-radius: 50%; margin: 0 auto 16px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 5px solid var(--score-color, var(--accent));
+    box-shadow: 0 0 30px var(--score-color, var(--accent));
+  }
+  .score-ring .score-num { font-size: 2rem; font-weight: 800; }
+  .score-ring .score-max { font-size: .75rem; color: var(--text-muted); }
+  .results-header h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; }
+  .results-header .interp { font-size: .85rem; color: var(--text-muted); }
+  .result-details { background: rgba(255,255,255,.03); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .result-details h4 { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--text-dim); margin-bottom: 12px; }
+  .result-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-size: .82rem; }
+  .result-row:last-child { border: none; }
+  .result-row .rr-q { color: var(--text-muted); flex: 1; }
+  .result-row .rr-a { font-weight: 600; color: var(--text); }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 600px) {
+    .pollen-grid { grid-template-columns: 1fr 1fr; }
+    .q-grid { grid-template-columns: 1fr; }
+    .answers-grid { grid-template-columns: 1fr; }
+    .answers-grid.cols-3 { grid-template-columns: 1fr 1fr; }
+    .modal-header h2 { font-size: .95rem; }
+    .question-text { font-size: .95rem; }
+    .status-banner { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="app-logo">
+      <div class="logo-icon">🌿</div>
+      <div>
+        <h1>Polen Mallorca</h1>
+        <p>Niveles de polens + Control de síntomas</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <span>📍 Estació Inca · Mallorca</span>
+      <span id="header-last-update">Cargando…</span>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="tab-pollen">
+      <span class="tab-icon">🌾</span> Polen
+    </button>
+    <button class="tab-btn" data-tab="tab-symptoms">
+      <span class="tab-icon">🫁</span> Mis Síntomas
+    </button>
+  </nav>
+
+  <!-- ═══════════════════ POLLEN TAB ═══════════════════ -->
+  <div id="tab-pollen" class="tab-panel active">
+
+    <div id="pollen-loading" class="api-message">
+      <div class="spinner"></div>
+      <h3>Obteniendo datos del PIA…</h3>
+      <p>Conectando con el Programa d'Informació Aerobiològica (aerobiologia.cat)</p>
+    </div>
+
+    <div id="pollen-content" style="display:none">
+      <!-- Status banner -->
+      <div class="status-banner" id="status-banner">
+        <div class="status-indicator" id="status-indicator">🌿</div>
+        <div class="info">
+          <h2 id="status-title">—</h2>
+          <p id="status-desc">—</p>
+        </div>
+        <div class="station-badge">📍 Inca · Mallorca</div>
+      </div>
+
+      <!-- Update row -->
+      <div class="update-row">
+        <span class="dot"></span>
+        <span id="update-info">—</span>
+        <button class="refresh-btn" onclick="fetchPollen(true)">↻ Actualizar</button>
+      </div>
+
+      <!-- Pollen grid -->
+      <p class="section-title">Niveles actuales</p>
+      <div id="pollen-grid" class="pollen-grid"></div>
+
+      <!-- Forecast chart -->
+      <p class="section-title">Previsión próximos días</p>
+      <div class="chart-card" id="forecast-section" style="display:none">
+        <h3>Evolución de pólenes</h3>
+        <p class="sub">Predicción por taxón para los próximos días · Estació Inca</p>
+        <div class="chart-wrap">
+          <canvas id="forecastChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Attribution -->
+      <div class="attribution">
+        <span>📊 Datos:</span>
+        <a href="https://aerobiologia.cat/pia/es" target="_blank">Programa d'Informació Aerobiològica (PIA)</a>
+        <span class="cc-badge">CC BY-NC-SA 4.0</span>
+        <span>Universitat Autònoma de Barcelona · Xarxa Aerobiològica de Catalunya</span>
+      </div>
+    </div>
+
+    <div id="pollen-error" style="display:none" class="api-message">
+      <div class="icon">⚠️</div>
+      <h3>No se pudieron cargar los datos</h3>
+      <p id="error-msg"></p>
+      <p style="margin-top:12px">
+        Si estás abriendo el archivo directamente (file://), el navegador puede bloquear la petición por CORS.<br>
+        Prueba a ejecutarlo con un servidor local: <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">python3 -m http.server 8080</code>
+      </p>
+      <button class="refresh-btn" style="margin:16px auto 0;display:flex" onclick="fetchPollen(true)">↻ Reintentar</button>
+    </div>
+
+  </div><!-- /tab-pollen -->
+
+  <!-- ═══════════════════ SYMPTOMS TAB ═══════════════════ -->
+  <div id="tab-symptoms" class="tab-panel">
+
+    <p class="section-title">Cuestionarios validados</p>
+    <div class="q-grid" id="q-grid"></div>
+
+    <p class="section-title">Evolución de síntomas</p>
+    <div class="chart-card" id="history-section">
+      <h3>Historial de puntuaciones</h3>
+      <p class="sub">Últimos 30 registros · almacenados localmente en tu dispositivo</p>
+      <div class="history-wrap">
+        <canvas id="historyChart"></canvas>
+      </div>
+    </div>
+
+    <p class="section-title">Registros guardados</p>
+    <div id="records-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+      <p style="font-size:.82rem;color:var(--text-muted)">Aún no hay registros. Completa tu primer cuestionario.</p>
+    </div>
+
+  </div><!-- /tab-symptoms -->
+
+</div><!-- /app-shell -->
+
+<!-- ═══════════════════ QUESTIONNAIRE MODAL ═══════════════════ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="mh-left">
+        <div class="q-type" id="modal-q-type" style="color:var(--accent)">—</div>
+        <h2 id="modal-q-title">—</h2>
+      </div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+
+    <div id="modal-quiz-view">
+      <div class="progress-area">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progress-fill" style="background:var(--accent);width:0%"></div>
+        </div>
+        <div class="progress-label">
+          <span id="progress-label-text">Pregunta 1</span>
+          <span id="progress-pct">0%</span>
+        </div>
+      </div>
+      <div class="question-area">
+        <div class="question-context" id="q-context" style="display:none"></div>
+        <p class="question-text" id="q-text"></p>
+        <div class="answers-grid" id="answers-grid"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="prevQuestion()">← Anterior</button>
+        <button class="btn-primary" id="next-btn" disabled onclick="nextQuestion()">Siguiente →</button>
+      </div>
+    </div>
+
+    <div id="modal-results-view" style="display:none">
+      <div class="results-area">
+        <div class="results-header">
+          <div class="score-ring" id="score-ring">
+            <span class="score-num" id="res-score">—</span>
+            <span class="score-max" id="res-max">/ —</span>
+          </div>
+          <h3 id="res-title">—</h3>
+          <p class="interp" id="res-interp">—</p>
+        </div>
+        <div class="result-details" id="result-details-list"></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn-secondary" style="flex:1" onclick="closeModal()">Cerrar</button>
+          <button class="btn-primary" style="flex:1" onclick="restartQuestionnaire()">↺ Repetir</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════
+   POLLEN LEVEL CONFIG
+═══════════════════════════════════════════════════ */
+const LEVEL_MAP = {
+  // Spanish
+  'nulo':     { label:'Sin datos', color:'#374151', pct:0  },
+  'sin datos':{ label:'Sin datos', color:'#374151', pct:0  },
+  'muy bajo': { label:'Muy bajo',  color:'#059669', pct:10 },
+  'bajo':     { label:'Bajo',      color:'#10b981', pct:30 },
+  'moderado': { label:'Moderado',  color:'#f59e0b', pct:50 },
+  'alto':     { label:'Alto',      color:'#f97316', pct:70 },
+  'muy alto': { label:'Muy alto',  color:'#ef4444', pct:87 },
+  'extremo':  { label:'Extremo',   color:'#7c3aed', pct:100},
+  // Catalan
+  'molt baix':{ label:'Muy bajo',  color:'#059669', pct:10 },
+  'baix':     { label:'Bajo',      color:'#10b981', pct:30 },
+  'moderat':  { label:'Moderado',  color:'#f59e0b', pct:50 },
+  'alt':      { label:'Alto',      color:'#f97316', pct:70 },
+  'molt alt': { label:'Muy alto',  color:'#ef4444', pct:87 },
+  'extrem':   { label:'Extremo',   color:'#7c3aed', pct:100},
+  // English
+  'low':      { label:'Bajo',      color:'#10b981', pct:30 },
+  'moderate': { label:'Moderado',  color:'#f59e0b', pct:50 },
+  'high':     { label:'Alto',      color:'#f97316', pct:70 },
+  'very high':{ label:'Muy alto',  color:'#ef4444', pct:87 },
+  'extreme':  { label:'Extremo',   color:'#7c3aed', pct:100},
+};
+
+const TREND_MAP = {
+  'bajando':   { icon:'↘', label:'Bajando', color:'#10b981' },
+  'estable':   { icon:'→', label:'Estable', color:'#f59e0b' },
+  'subiendo':  { icon:'↗', label:'Subiendo', color:'#ef4444' },
+  'baixant':   { icon:'↘', label:'Bajando', color:'#10b981' },
+  'pujant':    { icon:'↗', label:'Subiendo', color:'#ef4444' },
+  'decreasing':{ icon:'↘', label:'Bajando', color:'#10b981' },
+  'stable':    { icon:'→', label:'Estable', color:'#f59e0b' },
+  'increasing':{ icon:'↗', label:'Subiendo', color:'#ef4444' },
+};
+
+const POLLEN_ICONS = {
+  'gramín': '🌾', 'poace': '🌾', 'grass': '🌾',
+  'olive': '🫒',  'olivo': '🫒', 'olea':  '🫒',
+  'platanus': '🍁', 'plàtan': '🍁', 'plataners': '🍁',
+  'cupres': '🌲', 'ciprés': '🌲', 'cipré': '🌲',
+  'pari': '🌿',
+  'urtic': '🌿',
+  'bétul': '🌳', 'betul': '🌳', 'abedul': '🌳',
+  'alnus': '🌿', 'aliso': '🌿',
+  'artem': '🌼', 'artemisa': '🌼',
+  'cheno': '🌱', 'queno': '🌱', 'salso': '🌱',
+  'pinus': '🌲', 'pino': '🌲', 'pi ': '🌲',
+  'alternaria': '🍄', 'cladosp': '🍄', 'aspergi': '🍄',
+  'quercus': '🍂', 'roure': '🍂', 'roble': '🍂',
+  'populus': '🌳', 'àlam': '🌳', 'chopo': '🌳',
+  'fraxinus': '🌳', 'freix': '🌳', 'fresno': '🌳',
+  'default': '🌸',
+};
+
+function getPollenIcon(name) {
+  const lower = (name || '').toLowerCase();
+  for (const [key, icon] of Object.entries(POLLEN_ICONS)) {
+    if (lower.includes(key)) return icon;
+  }
+  return POLLEN_ICONS.default;
+}
+
+function levelInfo(raw) {
+  if (!raw) return { label:'Sin datos', color:'#374151', pct:0 };
+  const key = raw.toLowerCase().trim();
+  return LEVEL_MAP[key] || { label: raw, color: '#374151', pct: 5 };
+}
+
+function trendInfo(raw) {
+  if (!raw) return null;
+  const key = raw.toLowerCase().trim();
+  return TREND_MAP[key] || null;
+}
+
+function overallLevel(cards) {
+  const order = ['extremo','muy alto','alto','moderado','bajo','muy bajo','sin datos'];
+  const colorMap = { 'extremo':'#7c3aed','muy alto':'#ef4444','alto':'#f97316','moderado':'#f59e0b','bajo':'#10b981','muy bajo':'#059669','sin datos':'#374151' };
+  for (const lvl of order) {
+    if (cards.some(c => c.levelInfo.label.toLowerCase() === lvl)) {
+      return { label: lvl, color: colorMap[lvl] };
+    }
+  }
+  return { label:'Sin datos', color:'#374151' };
+}
+
+/* ═══════════════════════════════════════════════════
+   POLLEN FETCH & PARSE
+═══════════════════════════════════════════════════ */
+const POLLEN_CACHE_KEY = 'pollenDataV2';
+const CACHE_TTL = 23 * 60 * 60 * 1000; // 23h
+const API_URL   = 'https://aerobiologia.cat/api/v0/forecast/balears/es/xml';
+const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(API_URL)}`;
+
+let forecastChartInstance = null;
+
+async function fetchPollen(force = false) {
+  // Check cache
+  if (!force) {
+    const cached = localStorage.getItem(POLLEN_CACHE_KEY);
+    if (cached) {
+      try {
+        const obj = JSON.parse(cached);
+        if (Date.now() - obj.ts < CACHE_TTL) {
+          renderPollen(obj.xml, obj.ts);
+          return;
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  showPollenLoading();
+  let xml = null;
+  let err = null;
+
+  // Try direct first, then proxy
+  for (const url of [API_URL, PROXY_URL]) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      // Validate it looks like XML
+      if (text.trim().startsWith('<') && text.length > 100) { xml = text; break; }
+    } catch (e) { err = e; }
+  }
+
+  if (!xml) {
+    // Try to use last stale cache
+    const cached = localStorage.getItem(POLLEN_CACHE_KEY);
+    if (cached) {
+      try {
+        const obj = JSON.parse(cached);
+        renderPollen(obj.xml, obj.ts, true);
+        return;
+      } catch (e) { /* ignore */ }
+    }
+    showPollenError(err ? err.message : 'No se pudo conectar');
+    return;
+  }
+
+  const ts = Date.now();
+  localStorage.setItem(POLLEN_CACHE_KEY, JSON.stringify({ xml, ts }));
+  renderPollen(xml, ts);
+}
+
+function parsePollenXML(xml) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+
+  const cards = [];
+  const forecastByDate = {}; // { date: { taxon: level, ... } }
+
+  // Walk all elements, flexible approach
+  const allEls = doc.querySelectorAll('*');
+  let stationName = '';
+  let forecastDate = '';
+
+  // Try to find station
+  const stationEl = doc.querySelector('[nom],[name],[estacio],[estacion],[locality]');
+  if (stationEl) {
+    stationName = stationEl.getAttribute('nom') || stationEl.getAttribute('name') || stationEl.getAttribute('locality') || '';
+  }
+
+  // Try different element names for pollen/taxon entries
+  const taxonSelectors = ['taxon','pollen','polenspore','tipo','species','espece','espècie'];
+  let taxonEls = [];
+  for (const sel of taxonSelectors) {
+    const found = doc.querySelectorAll(sel);
+    if (found.length > 0) { taxonEls = Array.from(found); break; }
+  }
+
+  // If not found, try any element that has a 'nom' or 'name' attr and a level attr
+  if (taxonEls.length === 0) {
+    taxonEls = Array.from(allEls).filter(el => {
+      const attrs = el.getAttributeNames ? el.getAttributeNames() : [];
+      return (attrs.includes('nom') || attrs.includes('name')) &&
+             (attrs.includes('nivell') || attrs.includes('nivel') || attrs.includes('categoria') || attrs.includes('level') || attrs.includes('categoria'));
+    });
+  }
+
+  for (const el of taxonEls) {
+    const name = el.getAttribute('nom') || el.getAttribute('name') || el.getAttribute('taxon') || el.textContent.trim();
+    if (!name || name.length < 2) continue;
+
+    const rawLevel = el.getAttribute('nivell') || el.getAttribute('nivel') || el.getAttribute('categoria')
+                  || el.getAttribute('level') || el.getAttribute('categoria') || '';
+    const rawTrend = el.getAttribute('tendencia') || el.getAttribute('tendence') || el.getAttribute('trend') || '';
+
+    // Get date from parent
+    let date = '';
+    let parentEl = el.parentElement;
+    while (parentEl) {
+      date = parentEl.getAttribute('data') || parentEl.getAttribute('date') || parentEl.getAttribute('dia') || '';
+      if (date) break;
+      parentEl = parentEl.parentElement;
+    }
+
+    const li = levelInfo(rawLevel);
+    const ti = trendInfo(rawTrend);
+
+    cards.push({ name, rawLevel, rawTrend, levelInfo: li, trendInfo: ti, date, icon: getPollenIcon(name) });
+
+    if (date) {
+      if (!forecastByDate[date]) forecastByDate[date] = {};
+      forecastByDate[date][name] = li.pct;
+    }
+  }
+
+  // Deduplicate by name keeping the one with a date (most recent forecast)
+  const seen = {};
+  const deduped = [];
+  for (const c of cards) {
+    if (!seen[c.name]) { seen[c.name] = c; deduped.push(c); }
+    else if (c.date && !seen[c.name].date) { seen[c.name] = c; }
+  }
+
+  return { cards: deduped, forecastByDate, stationName };
+}
+
+function showPollenLoading() {
+  document.getElementById('pollen-loading').style.display = '';
+  document.getElementById('pollen-content').style.display = 'none';
+  document.getElementById('pollen-error').style.display = 'none';
+}
+
+function showPollenError(msg) {
+  document.getElementById('pollen-loading').style.display = 'none';
+  document.getElementById('pollen-content').style.display = 'none';
+  document.getElementById('pollen-error').style.display = '';
+  document.getElementById('error-msg').textContent = msg || '';
+}
+
+function renderPollen(xml, ts, stale = false) {
+  document.getElementById('pollen-loading').style.display = 'none';
+  document.getElementById('pollen-error').style.display = 'none';
+  document.getElementById('pollen-content').style.display = '';
+
+  const { cards, forecastByDate } = parsePollenXML(xml);
+
+  // Header
+  const dt = new Date(ts);
+  const fmtDate = dt.toLocaleDateString('es-ES', { weekday:'long', day:'2-digit', month:'long' });
+  const fmtTime = dt.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('header-last-update').textContent = `Actualizado: ${fmtDate}, ${fmtTime}`;
+
+  const staleNote = stale ? ' · Datos en caché (sin conexión)' : '';
+  const nextUpdate = new Date(ts + CACHE_TTL);
+  const nextFmt = nextUpdate.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('update-info').textContent =
+    `Datos del ${fmtDate} · Próxima actualización: ${nextFmt}${staleNote}`;
+
+  // Status banner
+  if (cards.length > 0) {
+    const overall = overallLevel(cards);
+    const banner = document.getElementById('status-banner');
+    const indicator = document.getElementById('status-indicator');
+    const statusEmojis = { 'extremo':'🚨','muy alto':'🔴','alto':'🟠','moderado':'🟡','bajo':'🟢','muy bajo':'✅','sin datos':'⚪' };
+    const statusDescs = {
+      'extremo':  'Concentraciones extremas. Se recomiendan medidas de protección máximas.',
+      'muy alto': 'Concentraciones muy elevadas. Evitar exposición prolongada al exterior.',
+      'alto':     'Concentraciones altas. Personas sensibles deben extremar precauciones.',
+      'moderado': 'Concentraciones moderadas. Precaución en personas alérgicas.',
+      'bajo':     'Concentraciones bajas. Riesgo reducido.',
+      'muy bajo': 'Concentraciones muy bajas. Situación favorable.',
+      'sin datos':'No hay datos disponibles en este momento.',
+    };
+    indicator.style.background = `radial-gradient(circle, ${overall.color}33, transparent)`;
+    indicator.style.border = `2px solid ${overall.color}`;
+    indicator.style.color = overall.color;
+    indicator.textContent = statusEmojis[overall.label] || '🌿';
+    document.getElementById('status-title').textContent = 'Nivel ' + (overall.label || '—');
+    document.getElementById('status-title').style.color = overall.color;
+    document.getElementById('status-desc').textContent = statusDescs[overall.label] || '';
+  }
+
+  // Render cards
+  const grid = document.getElementById('pollen-grid');
+  grid.innerHTML = '';
+  if (cards.length === 0) {
+    grid.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">No se encontraron datos de taxones en la respuesta XML.</p>';
+  } else {
+    for (const c of cards) {
+      grid.appendChild(buildPollenCard(c));
+    }
+  }
+
+  // Forecast chart
+  renderForecastChart(forecastByDate, cards);
+}
+
+function buildPollenCard(c) {
+  const div = document.createElement('div');
+  div.className = 'pollen-card';
+  div.style.setProperty('--lvl-color', c.levelInfo.color);
+
+  const ti = c.trendInfo;
+  const trendHtml = ti
+    ? `<span class="pollen-trend" title="${ti.label}" style="color:${ti.color}">${ti.icon}</span>`
+    : '';
+
+  const dateHtml = c.date
+    ? `<div class="pollen-date">📅 ${c.date}</div>` : '';
+
+  div.innerHTML = `
+    <div class="pollen-card-top">
+      <span class="pollen-icon">${c.icon}</span>
+      ${trendHtml}
+    </div>
+    <div class="pollen-name">${c.name}</div>
+    <div>
+      <span class="level-badge" style="color:${c.levelInfo.color}">
+        <span class="level-dot" style="background:${c.levelInfo.color}"></span>
+        ${c.levelInfo.label}
+      </span>
+    </div>
+    <div class="pollen-bar-wrap">
+      <div class="pollen-bar" style="width:${c.levelInfo.pct}%;background:${c.levelInfo.color}"></div>
+    </div>
+    ${dateHtml}
+  `;
+  return div;
+}
+
+function renderForecastChart(forecastByDate, allCards) {
+  const dates = Object.keys(forecastByDate).sort();
+  if (dates.length < 2 || allCards.length === 0) {
+    document.getElementById('forecast-section').style.display = 'none';
+    return;
+  }
+  document.getElementById('forecast-section').style.display = '';
+
+  // Get top 6 taxa by max level
+  const taxa = [...new Set(allCards.map(c => c.name))].slice(0, 8);
+
+  const CHART_COLORS = ['#38bdf8','#818cf8','#fb923c','#f472b6','#34d399','#facc15','#a78bfa','#60a5fa'];
+
+  const datasets = taxa.map((taxon, i) => ({
+    label: taxon,
+    data: dates.map(d => forecastByDate[d]?.[taxon] ?? null),
+    borderColor: CHART_COLORS[i % CHART_COLORS.length],
+    backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '22',
+    tension: .35,
+    fill: false,
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    borderWidth: 2,
+    spanGaps: true,
+  }));
+
+  if (forecastChartInstance) forecastChartInstance.destroy();
+
+  const ctx = document.getElementById('forecastChart').getContext('2d');
+  forecastChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#7986a8', font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: '#12192e', borderColor: 'rgba(255,255,255,.12)', borderWidth: 1,
+          callbacks: {
+            label: ctx => {
+              const pct = ctx.parsed.y;
+              const lvl = Object.values(LEVEL_MAP).find(l => l.pct === pct);
+              return ` ${ctx.dataset.label}: ${lvl ? lvl.label : pct + '%'}`;
+            }
+          }
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#7986a8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+        y: {
+          min: 0, max: 100,
+          ticks: {
+            color: '#7986a8', font: { size: 10 },
+            callback: v => { const lvl = Object.values(LEVEL_MAP).find(l => l.pct === v); return lvl ? lvl.label : ''; }
+          },
+          grid: { color: 'rgba(255,255,255,.04)' },
+        }
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   QUESTIONNAIRES DEFINITIONS
+═══════════════════════════════════════════════════ */
+const QUESTIONNAIRES = {
+  CAN: {
+    id: 'CAN',
+    name: 'Control del Asma',
+    abbr: 'CAN',
+    description: 'Cuestionario de Control del Asma en el Niño. Evalúa los síntomas respiratorios en las últimas 4 semanas.',
+    icon: '🫁',
+    color: '#38bdf8',
+    context: '⏱ Sobre las últimas 4 semanas',
+    maxScore: 36,
+    columns: 1,
+    thresholds: [
+      { max: 7,  label: '✅ Bien controlado', interp: 'Los síntomas están bien controlados. Sigue con el tratamiento habitual.', color: '#10b981' },
+      { max: 36, label: '⚠️ Mal controlado',  interp: 'Puntuación ≥8. El asma no está bien controlada. Consulta con tu médico.', color: '#ef4444' },
+    ],
+    questions: [
+      {
+        q: '¿Con qué frecuencia el niño/a tuvo tos durante el día?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia se despertó por la noche a causa de la tos?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia tuvo pitidos o sibilancias (pitos en el pecho)?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia le costó respirar por su asma?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia los síntomas le impidieron dormir bien?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia tuvo síntomas al hacer ejercicio, correr o reír?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia los síntomas limitaron sus actividades normales (jugar, deporte, colegio)?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Siempre', score:4 }
+        ]
+      },
+      {
+        q: '¿Con qué frecuencia necesitó usar el inhalador de alivio rápido (rescate)?',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'1-2 veces/sem.', score:1 },
+          { label:'3-4 veces/sem.', score:2 }, { label:'5-6 veces/sem.', score:3 }, { label:'Todos los días', score:4 }
+        ]
+      },
+      {
+        q: '¿Cómo valoras el control general del asma del niño/a en estas últimas 4 semanas?',
+        answers: [
+          { label:'Muy bien\ncontrolada', score:0 }, { label:'Bien controlada', score:1 },
+          { label:'Un poco controlada', score:2 }, { label:'Mal controlada', score:3 }, { label:'Muy mal\ncontrolada', score:4 }
+        ]
+      },
+    ]
+  },
+
+  CSHQ: {
+    id: 'CSHQ',
+    name: 'Calidad del Sueño',
+    abbr: 'CSHQ',
+    description: 'Children\'s Sleep Habits Questionnaire. Evalúa interrupciones del sueño relacionadas con la alergia.',
+    icon: '🌙',
+    color: '#818cf8',
+    context: '⏱ Sobre las últimas 2 semanas · Indica con qué frecuencia ocurre',
+    maxScore: 24,
+    columns: 3,
+    thresholds: [
+      { max: 15, label: '✅ Sueño adecuado', interp: 'El patrón de sueño se encuentra dentro de los límites normales.', color: '#10b981' },
+      { max: 20, label: '⚠️ Sueño alterado', interp: 'Hay algunas alteraciones del sueño. Observa si mejoran con el tratamiento.', color: '#f59e0b' },
+      { max: 24, label: '🚨 Sueño muy alterado', interp: 'Puntuación alta. El sueño está significativamente afectado. Consulta con el médico.', color: '#ef4444' },
+    ],
+    questions: [
+      {
+        q: 'Se resiste a irse a la cama a la hora habitual',
+        answers: [ { label:'Raramente\n(0-1 noches)', score:1 }, { label:'A veces\n(2-4 noches)', score:2 }, { label:'Habitualmente\n(5-7 noches)', score:3 } ]
+      },
+      {
+        q: 'Tiene miedo o ansiedad por quedarse solo para dormir',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+      {
+        q: 'Necesita la presencia de un adulto para quedarse dormido',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+      {
+        q: 'Se despierta una o más veces durante la noche',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+      {
+        q: 'Le cuesta volver a dormirse después de despertarse',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+      {
+        q: 'Ronca fuerte mientras duerme',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+      {
+        q: 'Parece cansado o somnoliento durante el día',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+      {
+        q: 'Le cuesta despertarse por la mañana para ir al colegio',
+        answers: [ { label:'Raramente', score:1 }, { label:'A veces', score:2 }, { label:'Habitualmente', score:3 } ]
+      },
+    ]
+  },
+
+  PedsQL: {
+    id: 'PedsQL',
+    name: 'Calidad de Vida',
+    abbr: 'PedsQL™',
+    description: 'Pediatric Quality of Life Inventory – Módulo Alergias. Evalúa el impacto físico y emocional de la alergia.',
+    icon: '❤️',
+    color: '#fb923c',
+    context: '⏱ En el último mes, ¿con qué frecuencia la alergia causó al niño/a…?',
+    maxScore: 100,
+    columns: 1,
+    thresholds: [
+      { max: 25, label: '✅ Impacto leve', interp: 'La alergia tiene poco impacto en la calidad de vida.', color: '#10b981' },
+      { max: 50, label: '⚠️ Impacto moderado', interp: 'Impacto moderado. Puede beneficiarse de un ajuste del tratamiento.', color: '#f59e0b' },
+      { max: 100, label: '🚨 Impacto grave', interp: 'La alergia afecta gravemente la calidad de vida. Consulta con el especialista.', color: '#ef4444' },
+    ],
+    questions: [
+      {
+        q: 'Picor, lagrimeo o estornudos constantes',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+      {
+        q: 'Sentirse cansado o sin energía',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+      {
+        q: 'Dificultad para hacer ejercicio o jugar al aire libre',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+      {
+        q: 'Faltar a clase o actividades extraescolares',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+      {
+        q: 'Sentirse enfadado, frustrado o triste por la alergia',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+      {
+        q: 'Sentirse diferente a los demás niños/as',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+      {
+        q: 'Dificultad para estar con amigos o familiares por los síntomas',
+        answers: [
+          { label:'Nunca', score:0 }, { label:'Casi nunca', score:1 },
+          { label:'A veces', score:2 }, { label:'Con frecuencia', score:3 }, { label:'Casi siempre', score:4 }
+        ]
+      },
+    ]
+  },
+
+  PRQLQ: {
+    id: 'PRQLQ',
+    name: 'Rinitis Alérgica',
+    abbr: 'PRQLQ',
+    description: 'Pediatric Rhinoconjunctivitis Quality of Life Questionnaire. Cuantifica los síntomas nasales y oculares.',
+    icon: '👃',
+    color: '#34d399',
+    context: '⏱ En la última semana · Indica cuánto molestaron los siguientes síntomas (0 = nada, 6 = muchísimo)',
+    maxScore: 6,
+    columns: 1,
+    scoreType: 'avg',
+    thresholds: [
+      { max: 1.5, label: '✅ Síntomas leves',    interp: 'Los síntomas nasales y oculares tienen un impacto mínimo.', color: '#10b981' },
+      { max: 3,   label: '⚠️ Síntomas moderados', interp: 'Impacto moderado de la rinitis. Valora ajustar el tratamiento.', color: '#f59e0b' },
+      { max: 6,   label: '🚨 Síntomas graves',   interp: 'Rinitis grave. Los síntomas limitan significativamente la vida diaria.', color: '#ef4444' },
+    ],
+    questions: [
+      {
+        q: 'Picor de nariz',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+      {
+        q: 'Estornudos',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+      {
+        q: 'Goteo nasal (moco)',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+      {
+        q: 'Nariz tapada / congestión nasal',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+      {
+        q: 'Picor o lagrimeo de ojos',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+      {
+        q: 'Dificultad para concentrarte a causa de los síntomas',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+      {
+        q: 'Limitación de actividades diarias por los síntomas',
+        answers: [
+          { label:'0 · Nada', score:0 }, { label:'1', score:1 }, { label:'2', score:2 },
+          { label:'3 · Moderado', score:3 }, { label:'4', score:4 }, { label:'5', score:5 }, { label:'6 · Muchísimo', score:6 }
+        ]
+      },
+    ]
+  }
+};
+
+/* ═══════════════════════════════════════════════════
+   SYMPTOMS HISTORY (localStorage)
+═══════════════════════════════════════════════════ */
+const HISTORY_KEY = 'symptomHistoryV2';
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveHistory(arr) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-200)));
+}
+
+/* ═══════════════════════════════════════════════════
+   QUESTIONNAIRE CARDS RENDER
+═══════════════════════════════════════════════════ */
+function renderQCards() {
+  const grid = document.getElementById('q-grid');
+  grid.innerHTML = '';
+  const history = loadHistory();
+
+  for (const [key, q] of Object.entries(QUESTIONNAIRES)) {
+    const lastEntries = history.filter(h => h.qid === key).slice(-1);
+    const last = lastEntries[0];
+
+    let lastScoreHtml = '';
+    if (last) {
+      const score = formatScore(last.score, q);
+      const lvl = getThreshold(last.score, q);
+      lastScoreHtml = `
+        <div class="last-score-row">
+          <div class="ls-label">Último registro · ${new Date(last.ts).toLocaleDateString('es-ES')}</div>
+          <div class="ls-val" style="color:${lvl.color}">${score}</div>
+        </div>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'q-card';
+    card.style.setProperty('--q-color', q.color);
+    card.innerHTML = `
+      <div class="q-icon">${q.icon}</div>
+      <div class="q-abbr">${q.abbr}</div>
+      <h3>${q.name}</h3>
+      <p>${q.description}</p>
+      <button class="start-btn" onclick="startQuestionnaire('${key}')">▶ Iniciar cuestionario</button>
+      ${lastScoreHtml}
+    `;
+    grid.appendChild(card);
+  }
+}
+
+function formatScore(score, q) {
+  if (q.scoreType === 'avg') return score.toFixed(1) + ' / 6';
+  if (q.id === 'PedsQL') return Math.round((score / 28) * 100) + '% afectado';
+  return score + ' / ' + q.maxScore;
+}
+
+function getThreshold(score, q) {
+  for (const t of q.thresholds) {
+    if (score <= t.max) return t;
+  }
+  return q.thresholds[q.thresholds.length - 1];
+}
+
+/* ═══════════════════════════════════════════════════
+   HISTORY CHART
+═══════════════════════════════════════════════════ */
+let historyChartInstance = null;
+
+function renderHistoryChart() {
+  const history = loadHistory();
+  const ctx = document.getElementById('historyChart').getContext('2d');
+
+  const Q_COLORS = { CAN:'#38bdf8', CSHQ:'#818cf8', PedsQL:'#fb923c', PRQLQ:'#34d399' };
+
+  const datasets = Object.keys(QUESTIONNAIRES).map(qid => {
+    const q = QUESTIONNAIRES[qid];
+    const entries = history.filter(h => h.qid === qid).slice(-30);
+    return {
+      label: q.abbr,
+      data: entries.map(e => ({
+        x: new Date(e.ts).toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit' }),
+        y: q.scoreType === 'avg' ? e.score : q.id === 'PedsQL' ? Math.round((e.score/28)*100) : e.score,
+      })),
+      borderColor: Q_COLORS[qid],
+      backgroundColor: Q_COLORS[qid] + '22',
+      tension: .3,
+      fill: false,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      borderWidth: 2,
+    };
+  }).filter(ds => ds.data.length > 0);
+
+  if (historyChartInstance) historyChartInstance.destroy();
+
+  historyChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#7986a8', font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: '#12192e', borderColor: 'rgba(255,255,255,.12)', borderWidth: 1,
+        },
+      },
+      scales: {
+        x: { type: 'category', ticks: { color: '#7986a8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+        y: { ticks: { color: '#7986a8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' }, min: 0 },
+      }
+    }
+  });
+}
+
+function renderRecordsList() {
+  const history = loadHistory().slice().reverse().slice(0, 20);
+  const list = document.getElementById('records-list');
+  if (history.length === 0) {
+    list.innerHTML = '<p style="font-size:.82rem;color:var(--text-muted)">Aún no hay registros. Completa tu primer cuestionario.</p>';
+    return;
+  }
+  list.innerHTML = history.map(e => {
+    const q = QUESTIONNAIRES[e.qid];
+    if (!q) return '';
+    const lvl = getThreshold(e.score, q);
+    const scoreStr = formatScore(e.score, q);
+    const dt = new Date(e.ts).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--card);border:1px solid var(--card-border);border-radius:10px;font-size:.82rem">
+      <span style="font-size:1.3rem">${q.icon}</span>
+      <div style="flex:1">
+        <div style="font-weight:600">${q.abbr} · ${q.name}</div>
+        <div style="color:var(--text-muted);font-size:.75rem">${dt}</div>
+      </div>
+      <div style="font-weight:700;color:${lvl.color}">${scoreStr}</div>
+      <span style="padding:3px 10px;border-radius:12px;background:${lvl.color}22;color:${lvl.color};font-size:.72rem;font-weight:600">${lvl.label.replace(/✅|⚠️|🚨/g,'').trim()}</span>
+      <button onclick="deleteRecord(${e.ts})" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1rem;padding:4px" title="Eliminar">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteRecord(ts) {
+  let history = loadHistory();
+  history = history.filter(e => e.ts !== ts);
+  saveHistory(history);
+  renderQCards();
+  renderHistoryChart();
+  renderRecordsList();
+}
+
+/* ═══════════════════════════════════════════════════
+   QUESTIONNAIRE WIZARD STATE
+═══════════════════════════════════════════════════ */
+let wizard = {
+  qid: null,
+  q: null,
+  step: 0,
+  answers: [],
+};
+
+function startQuestionnaire(qid) {
+  wizard.qid = qid;
+  wizard.q = QUESTIONNAIRES[qid];
+  wizard.step = 0;
+  wizard.answers = new Array(wizard.q.questions.length).fill(null);
+
+  // Setup modal header
+  document.getElementById('modal-q-type').textContent = wizard.q.abbr;
+  document.getElementById('modal-q-type').style.color = wizard.q.color;
+  document.getElementById('modal-q-title').textContent = wizard.q.name + ' · ' + wizard.q.description.split('.')[0];
+
+  // Show quiz view
+  document.getElementById('modal-quiz-view').style.display = '';
+  document.getElementById('modal-results-view').style.display = 'none';
+
+  // Update progress bar color
+  document.getElementById('progress-fill').style.background = wizard.q.color;
+
+  renderQuestion();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function renderQuestion() {
+  const q = wizard.q;
+  const step = wizard.step;
+  const total = q.questions.length;
+
+  // Progress
+  const pct = Math.round((step / total) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label-text').textContent = `Pregunta ${step + 1} de ${total}`;
+  document.getElementById('progress-pct').textContent = pct + '%';
+
+  // Context
+  const ctxEl = document.getElementById('q-context');
+  if (q.context) { ctxEl.textContent = q.context; ctxEl.style.display = ''; }
+  else ctxEl.style.display = 'none';
+
+  // Question
+  document.getElementById('q-text').textContent = q.questions[step].q;
+
+  // Answers
+  const grid = document.getElementById('answers-grid');
+  const answers = q.questions[step].answers;
+  const cols = q.columns === 3 || answers.length === 3 ? 'cols-3'
+             : answers.length >= 6 ? 'cols-3'
+             : answers.length === 2 ? 'cols-1'
+             : '';
+  grid.className = 'answers-grid ' + cols;
+  grid.innerHTML = '';
+
+  answers.forEach((a, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'ans-btn' + (wizard.answers[step] !== null && wizard.answers[step] === i ? ' selected' : '');
+    btn.innerHTML = `<span>${a.label.replace('\n','<br>')}</span>`;
+    btn.onclick = () => selectAnswer(i);
+    grid.appendChild(btn);
+  });
+
+  // Nav button
+  const nextBtn = document.getElementById('next-btn');
+  nextBtn.textContent = step === total - 1 ? 'Ver resultados ✓' : 'Siguiente →';
+  nextBtn.disabled = wizard.answers[step] === null;
+}
+
+function selectAnswer(answerIdx) {
+  wizard.answers[wizard.step] = answerIdx;
+
+  // Update UI
+  const btns = document.querySelectorAll('#answers-grid .ans-btn');
+  btns.forEach((b, i) => { b.classList.toggle('selected', i === answerIdx); });
+  btns[answerIdx].classList.add('choosing');
+
+  document.getElementById('next-btn').disabled = false;
+
+  // Auto-advance after short delay
+  setTimeout(() => nextQuestion(), 350);
+}
+
+function nextQuestion() {
+  if (wizard.answers[wizard.step] === null) return;
+  if (wizard.step < wizard.q.questions.length - 1) {
+    wizard.step++;
+    renderQuestion();
+  } else {
+    finishQuestionnaire();
+  }
+}
+
+function prevQuestion() {
+  if (wizard.step > 0) {
+    wizard.step--;
+    renderQuestion();
+  }
+}
+
+function finishQuestionnaire() {
+  const q = wizard.q;
+
+  // Calculate score
+  let rawSum = 0;
+  wizard.answers.forEach((ansIdx, qi) => {
+    if (ansIdx !== null) rawSum += q.questions[qi].answers[ansIdx].score;
+  });
+
+  let score = rawSum;
+  if (q.scoreType === 'avg') score = rawSum / q.questions.length;
+
+  // Save
+  const record = { qid: q.id, ts: Date.now(), score, answers: wizard.answers.slice() };
+  const history = loadHistory();
+  history.push(record);
+  saveHistory(history);
+
+  // Show results
+  showResults(q, score, wizard.answers);
+}
+
+function showResults(q, score, answers) {
+  document.getElementById('modal-quiz-view').style.display = 'none';
+  document.getElementById('modal-results-view').style.display = '';
+
+  const lvl = getThreshold(score, q);
+  const scoreStr = formatScore(score, q);
+
+  // Score ring
+  const ring = document.getElementById('score-ring');
+  ring.style.setProperty('--score-color', lvl.color);
+  ring.style.borderColor = lvl.color;
+  ring.style.boxShadow = `0 0 30px ${lvl.color}66`;
+  document.getElementById('res-score').textContent = q.scoreType === 'avg' ? score.toFixed(1) : q.id === 'PedsQL' ? Math.round((score/28)*100) : score;
+  document.getElementById('res-max').textContent = q.scoreType === 'avg' ? '/ 6' : q.id === 'PedsQL' ? '% afect.' : `/ ${q.maxScore}`;
+  document.getElementById('res-title').textContent = lvl.label;
+  document.getElementById('res-interp').textContent = lvl.interp;
+
+  // Detail rows
+  const detailsEl = document.getElementById('result-details-list');
+  detailsEl.innerHTML = `<h4>Respuestas detalladas</h4>` +
+    q.questions.map((qObj, qi) => {
+      const ansIdx = answers[qi];
+      const ans = ansIdx !== null ? qObj.answers[ansIdx] : null;
+      return `<div class="result-row">
+        <span class="rr-q">${qi+1}. ${qObj.q}</span>
+        <span class="rr-a">${ans ? ans.label.replace('\n',' ') : '—'} (${ans ? ans.score : '?'})</span>
+      </div>`;
+    }).join('');
+
+  // Refresh everything
+  renderQCards();
+  renderHistoryChart();
+  renderRecordsList();
+}
+
+function restartQuestionnaire() {
+  startQuestionnaire(wizard.qid);
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+/* Close on backdrop click */
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+/* ═══════════════════════════════════════════════════
+   TAB NAVIGATION
+═══════════════════════════════════════════════════ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ═══════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════ */
+(function init() {
+  // Pollen tab
+  fetchPollen();
+
+  // Symptoms tab
+  renderQCards();
+  renderHistoryChart();
+  renderRecordsList();
+
+  // Auto-refresh pollen every 24h
+  setInterval(() => fetchPollen(), 24 * 60 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
