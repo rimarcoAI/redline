@@ -1,8 +1,9 @@
 (function () {
   "use strict";
 
-  const EXERCISES = window.EXERCISES_DATA || [];
-  const BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
+  const EXERCISES_BASE = window.EXERCISES_DATA || [];
+  let EXERCISES = EXERCISES_BASE;
+  let BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
 
   const LABELS = {
     bodyPart: {
@@ -67,6 +68,7 @@
   // ---------------------------------------------------------------------
   const STORAGE_TAGS = "exgym_exercise_tags_v1";
   const STORAGE_ROUTINES = "exgym_routines_v1";
+  const STORAGE_CUSTOM = "exgym_custom_exercises_v1";
 
   function loadJSON(key, fallback) {
     try {
@@ -82,9 +84,17 @@
 
   let exerciseTags = loadJSON(STORAGE_TAGS, {}); // { exerciseId: [tags] }
   let routines = loadJSON(STORAGE_ROUTINES, []); // [{id, title, tags, exerciseIds, createdAt, updatedAt}]
+  let customExercises = loadJSON(STORAGE_CUSTOM, []); // exercises created by the user
 
   function persistTags() { saveJSON(STORAGE_TAGS, exerciseTags); }
   function persistRoutines() { saveJSON(STORAGE_ROUTINES, routines); }
+  function persistCustomExercises() { saveJSON(STORAGE_CUSTOM, customExercises); rebuildExerciseIndex(); }
+
+  function rebuildExerciseIndex() {
+    EXERCISES = EXERCISES_BASE.concat(customExercises);
+    BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
+  }
+  rebuildExerciseIndex();
 
   function getExerciseTags(id) { return exerciseTags[id] || []; }
 
@@ -131,6 +141,16 @@
     return "r_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   }
 
+  function slugify(s) {
+    const slug = (s || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    return slug || "rutina";
+  }
+
   // ---------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------
@@ -147,6 +167,7 @@
     routineTagFilter: new Set(),
     editingRoutineId: null,
     routineDraftExerciseIds: [],
+    displayMode: "grid", // "grid" | "list"
   };
 
   // ---------------------------------------------------------------------
@@ -167,6 +188,8 @@
   const selectionBar = $("#selectionBar");
   const selectionCount = $("#selectionCount");
   const selectModeToggle = $("#selectModeToggle");
+  const viewModeToggle = $("#viewModeToggle");
+  const addExerciseBtn = $("#addExerciseBtn");
 
   const routinesGrid = $("#routinesGrid");
   const emptyRoutines = $("#emptyRoutines");
@@ -176,6 +199,8 @@
   const exerciseModalBody = $("#exerciseModalBody");
   const routineModal = $("#routineModal");
   const routineModalBody = $("#routineModalBody");
+  const exerciseFormModal = $("#exerciseFormModal");
+  const exerciseFormModalBody = $("#exerciseFormModalBody");
 
   function showToast(msg) {
     const toast = $("#toast");
@@ -186,15 +211,30 @@
   }
 
   function closeModal(el) { el.hidden = true; el.querySelector(".modal-body").innerHTML = ""; }
+  function closeAllModals() {
+    closeModal(exerciseModal);
+    closeModal(routineModal);
+    closeModal(exerciseFormModal);
+  }
   document.addEventListener("click", (e) => {
     if (e.target.matches("[data-close-modal]") || e.target.classList.contains("modal-overlay")) {
-      closeModal(exerciseModal);
-      closeModal(routineModal);
+      closeAllModals();
     }
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closeModal(exerciseModal); closeModal(routineModal); }
+    if (e.key === "Escape") { closeAllModals(); }
   });
+
+  // "error" doesn't bubble, but capturing listeners on ancestors still fire.
+  document.addEventListener("error", (e) => {
+    const img = e.target;
+    if (img.tagName === "IMG" && img.closest(".card-media, .modal-media, .routine-thumbs, .picker-row, .chosen-row")) {
+      const placeholder = document.createElement("span");
+      placeholder.className = "no-media";
+      placeholder.textContent = "Sin imagen";
+      img.replaceWith(placeholder);
+    }
+  }, true);
 
   // ---------------------------------------------------------------------
   // Tabs
@@ -313,6 +353,16 @@
     openRoutineEditor(null, [...state.selected]);
   });
 
+  $$(".view-mode-btn", viewModeToggle).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.displayMode = btn.dataset.mode;
+      $$(".view-mode-btn", viewModeToggle).forEach((b) => b.classList.toggle("active", b === btn));
+      renderGrid();
+    });
+  });
+
+  addExerciseBtn.addEventListener("click", () => openExerciseForm(null));
+
   function updateSelectionBar() {
     selectionBar.hidden = !state.selectMode;
     selectionCount.textContent = state.selected.size;
@@ -342,9 +392,9 @@
     });
   }
 
-  function exerciseCard(e) {
+  function exerciseCard(e, mode) {
     const card = document.createElement("div");
-    card.className = "exercise-card" + (state.selected.has(e.id) ? " selected" : "");
+    card.className = "exercise-card" + (mode === "list" ? " list-row" : "") + (state.selected.has(e.id) ? " selected" : "");
     card.dataset.id = e.id;
 
     const tags = getExerciseTags(e.id);
@@ -359,6 +409,7 @@
           <span class="badge body-part">${label("bodyPart", e.bodyPart)}</span>
           <span class="badge">${label("muscle", e.muscle)}</span>
           <span class="badge">${label("equipment", e.equipment)}</span>
+          ${e.custom ? '<span class="badge custom">Personalizado</span>' : ""}
         </div>
         ${tags.length ? `<div class="card-tags">${tags.map((t) => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       </div>
@@ -384,8 +435,9 @@
   function renderGrid() {
     const list = filteredExercises();
     grid.innerHTML = "";
+    grid.classList.toggle("list-mode", state.displayMode === "list");
     const frag = document.createDocumentFragment();
-    list.forEach((e) => frag.appendChild(exerciseCard(e)));
+    list.forEach((e) => frag.appendChild(exerciseCard(e, state.displayMode)));
     grid.appendChild(frag);
     resultsCount.textContent = `${list.length} ejercicio${list.length === 1 ? "" : "s"}`;
     emptyState.hidden = list.length !== 0;
@@ -464,14 +516,19 @@
     const e = BY_ID.get(id);
     if (!e) return;
     exerciseModalBody.innerHTML = `
-      <div class="modal-media">${e.gifUrl ? `<img src="${e.gifUrl}" alt="${escapeHtml(e.name)}">` : ""}</div>
+      <div class="modal-media">${e.gifUrl ? `<img src="${e.gifUrl}" alt="${escapeHtml(e.name)}">` : '<span class="no-media">Sin imagen</span>'}</div>
       <h2 class="modal-title">${escapeHtml(e.name)}</h2>
       <div class="modal-badges">
         <span class="badge body-part">${label("bodyPart", e.bodyPart)}</span>
         <span class="badge">${label("muscle", e.muscle)}</span>
         <span class="badge">${label("equipment", e.equipment)}</span>
         <span class="badge">${label("category", e.category)}</span>
+        ${e.custom ? '<span class="badge custom">Personalizado</span>' : ""}
       </div>
+      ${e.custom ? `
+        <div class="modal-section">
+          <button class="btn small" id="editCustomExerciseBtn" type="button">Editar ejercicio</button>
+        </div>` : ""}
       ${e.secondaryMuscles && e.secondaryMuscles.length ? `
         <div class="modal-section">
           <h4>Músculos secundarios</h4>
@@ -489,12 +546,379 @@
     `;
     exerciseModal.hidden = false;
 
+    if (e.custom) {
+      $("#editCustomExerciseBtn").addEventListener("click", () => {
+        closeModal(exerciseModal);
+        openExerciseForm(e);
+      });
+    }
+
     wireTagEditor(
       () => getExerciseTags(e.id),
       (raw) => addTagToExercise(e.id, raw),
       (tag) => removeTagFromExercise(e.id, tag),
       () => { openExerciseModal(e.id); renderGrid(); renderTagFilter(); }
     );
+  }
+
+  // ---------------------------------------------------------------------
+  // Custom exercise create / edit form
+  // ---------------------------------------------------------------------
+  function openExerciseForm(existing) {
+    let draftTags = existing ? getExerciseTags(existing.id).slice() : [];
+    const bodyPartOptions = Object.keys(LABELS.bodyPart);
+    const equipmentOptions = Object.keys(LABELS.equipment);
+    const categoryOptions = Object.keys(LABELS.category);
+    const muscleOptions = Object.keys(LABELS.muscle);
+
+    exerciseFormModalBody.innerHTML = `
+      <h2 class="modal-title">${existing ? "Editar ejercicio" : "Añadir ejercicio"}</h2>
+      <div class="routine-editor-field">
+        <label>Nombre</label>
+        <input type="text" id="exFormName" placeholder="Ej. Curl de bíceps con banda" value="${escapeHtml(existing ? existing.name : "")}">
+      </div>
+      <div class="exercise-form-grid">
+        <div class="routine-editor-field">
+          <label>Parte del cuerpo</label>
+          <select id="exFormBodyPart">${bodyPartOptions.map((v) => `<option value="${v}" ${existing && existing.bodyPart === v ? "selected" : ""}>${label("bodyPart", v)}</option>`).join("")}</select>
+        </div>
+        <div class="routine-editor-field">
+          <label>Músculo</label>
+          <input type="text" id="exFormMuscle" list="exFormMuscleOptions" value="${escapeHtml(existing ? existing.muscle : "")}" placeholder="Ej. biceps">
+          <datalist id="exFormMuscleOptions">${muscleOptions.map((v) => `<option value="${v}">${label("muscle", v)}</option>`).join("")}</datalist>
+        </div>
+        <div class="routine-editor-field">
+          <label>Equipamiento</label>
+          <select id="exFormEquipment">${equipmentOptions.map((v) => `<option value="${v}" ${existing && existing.equipment === v ? "selected" : ""}>${label("equipment", v)}</option>`).join("")}</select>
+        </div>
+        <div class="routine-editor-field">
+          <label>Categoría</label>
+          <select id="exFormCategory">${categoryOptions.map((v) => `<option value="${v}" ${existing && existing.category === v ? "selected" : ""}>${label("category", v)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <div class="routine-editor-field">
+        <label>Instrucciones (una por línea, opcional)</label>
+        <textarea id="exFormInstructions" rows="4">${escapeHtml(existing && existing.instructions ? existing.instructions.join("\n") : "")}</textarea>
+      </div>
+      <div class="routine-editor-field" id="exFormTagsField">
+        <label>Etiquetas</label>
+        ${tagEditorHtml(draftTags)}
+      </div>
+      <div class="routine-editor-footer">
+        ${existing ? '<button class="btn danger" id="deleteExerciseBtn" type="button">Eliminar ejercicio</button>' : ""}
+        <button class="btn ghost" id="cancelExerciseFormBtn" type="button">Cancelar</button>
+        <button class="btn primary" id="saveExerciseFormBtn" type="button">Guardar ejercicio</button>
+      </div>
+    `;
+    exerciseFormModal.hidden = false;
+
+    function rerenderTagBlock() {
+      $("#exFormTagsField").innerHTML = `<label>Etiquetas</label>${tagEditorHtml(draftTags)}`;
+      wireTagEditor(
+        () => draftTags,
+        (raw) => { const t = normalizeTag(raw); if (t && !draftTags.includes(t)) draftTags.push(t); },
+        (tag) => { draftTags = draftTags.filter((t) => t !== tag); },
+        rerenderTagBlock
+      );
+    }
+    rerenderTagBlock();
+
+    $("#cancelExerciseFormBtn").addEventListener("click", () => closeModal(exerciseFormModal));
+
+    if (existing) {
+      $("#deleteExerciseBtn").addEventListener("click", () => {
+        if (!confirm(`¿Eliminar "${existing.name}"?`)) return;
+        customExercises = customExercises.filter((x) => x.id !== existing.id);
+        delete exerciseTags[existing.id];
+        persistTags();
+        routines.forEach((r) => { r.exerciseIds = r.exerciseIds.filter((id) => id !== existing.id); });
+        persistRoutines();
+        persistCustomExercises();
+        closeModal(exerciseFormModal);
+        populateDependentFilters();
+        renderAll();
+        showToast("Ejercicio eliminado");
+      });
+    }
+
+    $("#saveExerciseFormBtn").addEventListener("click", () => {
+      const name = $("#exFormName").value.trim();
+      if (!name) { showToast("Ponle un nombre al ejercicio"); return; }
+      const bodyPart = $("#exFormBodyPart").value;
+      const muscle = $("#exFormMuscle").value.trim() || bodyPart;
+      const equipment = $("#exFormEquipment").value;
+      const category = $("#exFormCategory").value;
+      const instructions = $("#exFormInstructions").value.split("\n").map((s) => s.trim()).filter(Boolean);
+
+      let saved;
+      if (existing) {
+        existing.name = name;
+        existing.bodyPart = bodyPart;
+        existing.muscle = muscle;
+        existing.equipment = equipment;
+        existing.category = category;
+        existing.instructions = instructions;
+        saved = existing;
+      } else {
+        saved = {
+          id: "custom:" + uid(),
+          slug: slugify(name),
+          name,
+          bodyPart,
+          muscle,
+          equipment,
+          category,
+          secondaryMuscles: [],
+          instructions,
+          custom: true,
+        };
+        customExercises.push(saved);
+      }
+      exerciseTags[saved.id] = draftTags;
+      persistTags();
+      persistCustomExercises();
+      closeModal(exerciseFormModal);
+      populateDependentFilters();
+      renderAll();
+      showToast(existing ? "Ejercicio guardado" : "Ejercicio añadido");
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // GIF export (self-contained GIF89a encoder, no external libraries)
+  // ---------------------------------------------------------------------
+  class BitWriter {
+    constructor() { this.bytes = []; this.bitBuffer = 0; this.bitCount = 0; }
+    writeBits(value, nbits) {
+      this.bitBuffer |= value << this.bitCount;
+      this.bitCount += nbits;
+      while (this.bitCount >= 8) {
+        this.bytes.push(this.bitBuffer & 0xff);
+        this.bitBuffer >>>= 8;
+        this.bitCount -= 8;
+      }
+    }
+    flush() {
+      if (this.bitCount > 0) { this.bytes.push(this.bitBuffer & 0xff); this.bitBuffer = 0; this.bitCount = 0; }
+    }
+  }
+
+  function lzwEncode(pixels, minCodeSize) {
+    const CLEAR = 1 << minCodeSize;
+    const EOI = CLEAR + 1;
+    const bw = new BitWriter();
+    let codeSize = minCodeSize + 1;
+    let nextCode = EOI + 1;
+    let dict = new Map();
+
+    bw.writeBits(CLEAR, codeSize);
+    let w = "";
+    for (let i = 0; i < pixels.length; i++) {
+      const c = String.fromCharCode(pixels[i]);
+      if (w === "") { w = c; continue; }
+      const wc = w + c;
+      if (dict.has(wc)) {
+        w = wc;
+      } else {
+        const code = w.length === 1 ? w.charCodeAt(0) : dict.get(w);
+        bw.writeBits(code, codeSize);
+        dict.set(wc, nextCode);
+        nextCode++;
+        // GIF's LZW is "early change": since the decoder only learns a new
+        // dictionary entry exists once it has decoded the code *after* the
+        // one that created it, the encoder must widen codes one code later
+        // than the dictionary size alone would suggest (nextCode + 1, not
+        // nextCode) to stay in lockstep with the decoder.
+        if (nextCode === (1 << codeSize) + 1 && codeSize < 12) {
+          codeSize++;
+        } else if (nextCode === 4096) {
+          bw.writeBits(CLEAR, codeSize);
+          dict = new Map();
+          nextCode = EOI + 1;
+          codeSize = minCodeSize + 1;
+        }
+        w = c;
+      }
+    }
+    if (w !== "") {
+      const code = w.length === 1 ? w.charCodeAt(0) : dict.get(w);
+      bw.writeBits(code, codeSize);
+    }
+    bw.writeBits(EOI, codeSize);
+    bw.flush();
+    return bw.bytes;
+  }
+
+  function writeSubBlocks(bytes, out) {
+    let i = 0;
+    while (i < bytes.length) {
+      const chunkLen = Math.min(255, bytes.length - i);
+      out.push(chunkLen);
+      for (let j = 0; j < chunkLen; j++) out.push(bytes[i + j]);
+      i += chunkLen;
+    }
+    out.push(0);
+  }
+
+  function buildFixedPalette() {
+    const levels = [0, 51, 102, 153, 204, 255];
+    const palette = [];
+    for (const r of levels) for (const g of levels) for (const b of levels) palette.push([r, g, b]);
+    while (palette.length < 256) palette.push([0, 0, 0]);
+    return palette;
+  }
+  const GIF_PALETTE = buildFixedPalette();
+
+  function nearestPaletteIndex(r, g, b) {
+    const idx = (v) => Math.min(5, Math.max(0, Math.round(v / 51)));
+    return idx(r) * 36 + idx(g) * 6 + idx(b);
+  }
+
+  function quantizeFrame(imageData) {
+    const data = imageData.data;
+    const indices = new Uint8Array(imageData.width * imageData.height);
+    for (let p = 0, i = 0; p < data.length; p += 4, i++) {
+      indices[i] = nearestPaletteIndex(data[p], data[p + 1], data[p + 2]);
+    }
+    return indices;
+  }
+
+  function buildGif(frames, width, height, palette, delayCs) {
+    const out = [];
+    const pushStr = (s) => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
+    const pushInt16 = (v) => out.push(v & 0xff, (v >> 8) & 0xff);
+
+    pushStr("GIF89a");
+    pushInt16(width);
+    pushInt16(height);
+    out.push(0xf7, 0, 0); // global color table, 256 entries; background index 0; aspect 0
+    for (let i = 0; i < 256; i++) {
+      const c = palette[i] || [0, 0, 0];
+      out.push(c[0], c[1], c[2]);
+    }
+
+    if (frames.length > 1) {
+      out.push(0x21, 0xff, 0x0b);
+      pushStr("NETSCAPE2.0");
+      out.push(0x03, 0x01, 0x00, 0x00, 0x00); // loop forever
+    }
+
+    frames.forEach((frame) => {
+      out.push(0x21, 0xf9, 0x04, 0x04);
+      pushInt16(delayCs);
+      out.push(0x00, 0x00); // transparent color index, block terminator
+      out.push(0x2c);
+      pushInt16(0); pushInt16(0); pushInt16(width); pushInt16(height);
+      out.push(0x00);
+      out.push(8); // LZW minimum code size
+      writeSubBlocks(lzwEncode(frame, 8), out);
+    });
+
+    out.push(0x3b);
+    return new Uint8Array(out);
+  }
+
+  function loadImageForCanvas(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("image load failed"));
+      img.src = src;
+    });
+  }
+
+  function wrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight, maxLines) {
+    const words = text.split(" ");
+    const lines = [];
+    let current = "";
+    for (const word of words) {
+      const test = current ? current + " " + word : word;
+      if (current && ctx.measureText(test).width > maxWidth) {
+        lines.push(current);
+        current = word;
+        if (lines.length === maxLines) break;
+      } else {
+        current = test;
+      }
+    }
+    if (lines.length < maxLines && current) lines.push(current);
+    lines.slice(0, maxLines).forEach((line, i) => ctx.fillText(line, cx, y + i * lineHeight));
+  }
+
+  const GIF_FRAME_W = 480;
+  const GIF_FRAME_H = 340;
+
+  async function renderExerciseFrame(exercise, routineTitle, index, total) {
+    const canvas = document.createElement("canvas");
+    canvas.width = GIF_FRAME_W;
+    canvas.height = GIF_FRAME_H;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#161923";
+    ctx.fillRect(0, 0, GIF_FRAME_W, GIF_FRAME_H);
+    ctx.fillStyle = "#7c5cff";
+    ctx.fillRect(0, 0, GIF_FRAME_W, 40);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText(routineTitle, 14, 20, GIF_FRAME_W - 28);
+
+    const boxSize = 200;
+    const boxX = (GIF_FRAME_W - boxSize) / 2;
+    const boxY = 50;
+    let img = null;
+    const src = exercise.thumbUrl || exercise.gifUrl;
+    if (src) {
+      try { img = await loadImageForCanvas(src); } catch (err) { img = null; }
+    }
+    if (img) {
+      ctx.drawImage(img, boxX, boxY, boxSize, boxSize);
+    } else {
+      ctx.fillStyle = "#1d212e";
+      ctx.fillRect(boxX, boxY, boxSize, boxSize);
+      ctx.fillStyle = "#9aa1b2";
+      ctx.font = "13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Sin imagen", GIF_FRAME_W / 2, boxY + boxSize / 2);
+    }
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#eef0f4";
+    ctx.font = "bold 16px sans-serif";
+    ctx.textBaseline = "alphabetic";
+    wrapCenteredText(ctx, exercise.name, GIF_FRAME_W / 2, boxY + boxSize + 26, GIF_FRAME_W - 40, 20, 2);
+
+    ctx.fillStyle = "#5ce6c4";
+    ctx.font = "13px sans-serif";
+    const muscleLine = [label("bodyPart", exercise.bodyPart), label("muscle", exercise.muscle)].filter(Boolean).join(" · ");
+    ctx.fillText(muscleLine, GIF_FRAME_W / 2, GIF_FRAME_H - 34);
+
+    ctx.fillStyle = "#9aa1b2";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(`${index + 1} / ${total}`, GIF_FRAME_W / 2, GIF_FRAME_H - 14);
+
+    return ctx.getImageData(0, 0, GIF_FRAME_W, GIF_FRAME_H);
+  }
+
+  async function exportRoutineAsGif(routine) {
+    const exs = routine.exerciseIds.map((id) => BY_ID.get(id)).filter(Boolean);
+    if (!exs.length) { showToast("La rutina no tiene ejercicios"); return; }
+    const frames = [];
+    for (let i = 0; i < exs.length; i++) {
+      const imageData = await renderExerciseFrame(exs[i], routine.title, i, exs.length);
+      frames.push(quantizeFrame(imageData));
+    }
+    const gifBytes = buildGif(frames, GIF_FRAME_W, GIF_FRAME_H, GIF_PALETTE, 150);
+    const blob = new Blob([gifBytes], { type: "image/gif" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = slugify(routine.title) + ".gif";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
   // ---------------------------------------------------------------------
@@ -532,6 +956,7 @@
       ${routine.tags && routine.tags.length ? `<div class="routine-tags">${routine.tags.map((t) => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       <div class="routine-actions">
         <button class="btn small" data-edit-routine="${routine.id}">Editar</button>
+        <button class="btn small" data-export-gif="${routine.id}">Exportar GIF</button>
         <button class="btn small danger" data-delete-routine="${routine.id}">Eliminar</button>
       </div>
     `;
@@ -557,6 +982,7 @@
   routinesGrid.addEventListener("click", (e) => {
     const editBtn = e.target.closest("[data-edit-routine]");
     const delBtn = e.target.closest("[data-delete-routine]");
+    const gifBtn = e.target.closest("[data-export-gif]");
     if (editBtn) {
       const r = routines.find((x) => x.id === editBtn.dataset.editRoutine);
       if (r) openRoutineEditor(r.id, r.exerciseIds);
@@ -568,6 +994,18 @@
         persistRoutines();
         renderRoutines();
         showToast("Rutina eliminada");
+      }
+    }
+    if (gifBtn) {
+      const r = routines.find((x) => x.id === gifBtn.dataset.exportGif);
+      if (r) {
+        gifBtn.disabled = true;
+        gifBtn.textContent = "Generando…";
+        showToast("Generando GIF…");
+        exportRoutineAsGif(r)
+          .then(() => showToast("GIF descargado"))
+          .catch(() => showToast("No se pudo generar el GIF"))
+          .finally(() => { gifBtn.disabled = false; gifBtn.textContent = "Exportar GIF"; });
       }
     }
   });

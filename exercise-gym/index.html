@@ -69,10 +69,17 @@
     <section class="results">
       <div class="results-header">
         <span id="resultsCount" class="results-count"></span>
-        <label class="select-mode-toggle">
-          <input type="checkbox" id="selectModeToggle">
-          Modo selección (para rutina)
-        </label>
+        <div class="results-header-actions">
+          <div class="view-mode-toggle" id="viewModeToggle">
+            <button class="view-mode-btn active" data-mode="grid" title="Ver en cuadrícula" type="button">▦ Cuadrícula</button>
+            <button class="view-mode-btn" data-mode="list" title="Ver en lista" type="button">☰ Lista</button>
+          </div>
+          <label class="select-mode-toggle">
+            <input type="checkbox" id="selectModeToggle">
+            Modo selección (para rutina)
+          </label>
+          <button id="addExerciseBtn" class="btn primary small" type="button">+ Añadir ejercicio</button>
+        </div>
       </div>
       <div id="exerciseGrid" class="exercise-grid"></div>
       <p id="emptyState" class="empty-state" hidden>No se encontraron ejercicios con estos filtros.</p>
@@ -107,6 +114,14 @@
   <div class="modal modal-wide">
     <button class="modal-close" data-close-modal>✕</button>
     <div class="modal-body" id="routineModalBody"></div>
+  </div>
+</div>
+
+<!-- ===== MODAL: AÑADIR / EDITAR EJERCICIO PERSONALIZADO ===== -->
+<div id="exerciseFormModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <button class="modal-close" data-close-modal>✕</button>
+    <div class="modal-body" id="exerciseFormModalBody"></div>
   </div>
 </div>
 
