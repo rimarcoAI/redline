@@ -122,7 +122,7 @@ button {
 .view { display: none; }
 .view.active { display: block; }
 
-#view-exercises {
+#view-exercises.active {
   display: grid;
   grid-template-columns: 250px 1fr;
   gap: 24px;
@@ -130,7 +130,7 @@ button {
 }
 
 @media (max-width: 900px) {
-  #view-exercises { grid-template-columns: 1fr; }
+  #view-exercises.active { grid-template-columns: 1fr; }
 }
 
 /* ===== Filters ===== */
