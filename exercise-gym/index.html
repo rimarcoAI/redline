@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exercise Gym — Ejercicios y Rutinas</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-icon">🏋️</span>
+    <span class="brand-name">Exercise Gym</span>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="exercises">Ejercicios</button>
+    <button class="tab" data-view="routines">Mis rutinas</button>
+  </nav>
+  <div class="selection-bar" id="selectionBar" hidden>
+    <span id="selectionCount">0</span> seleccionados
+    <button id="clearSelectionBtn" class="btn ghost small">Limpiar</button>
+    <button id="createRoutineFromSelectionBtn" class="btn primary small">Crear rutina</button>
+  </div>
+</header>
+
+<main id="app">
+
+  <!-- ===== VISTA: EJERCICIOS ===== -->
+  <section id="view-exercises" class="view active">
+    <aside class="filters">
+      <div class="filter-block">
+        <input type="search" id="searchInput" placeholder="Buscar ejercicio…" class="search-input">
+      </div>
+
+      <div class="filter-block">
+        <h3>Parte del cuerpo</h3>
+        <div class="chip-group" id="filterBodyPart"></div>
+      </div>
+
+      <div class="filter-block">
+        <h3>Músculo</h3>
+        <select id="filterMuscle" class="select-input">
+          <option value="">Todos los músculos</option>
+        </select>
+      </div>
+
+      <div class="filter-block">
+        <h3>Equipamiento</h3>
+        <select id="filterEquipment" class="select-input">
+          <option value="">Todo el equipamiento</option>
+        </select>
+      </div>
+
+      <div class="filter-block">
+        <h3>Categoría</h3>
+        <div class="chip-group" id="filterCategory"></div>
+      </div>
+
+      <div class="filter-block">
+        <h3>Etiquetas</h3>
+        <div class="chip-group" id="filterTags">
+          <span class="hint">Aún no hay etiquetas creadas.</span>
+        </div>
+      </div>
+
+      <button id="resetFiltersBtn" class="btn ghost full">Quitar filtros</button>
+    </aside>
+
+    <section class="results">
+      <div class="results-header">
+        <span id="resultsCount" class="results-count"></span>
+        <label class="select-mode-toggle">
+          <input type="checkbox" id="selectModeToggle">
+          Modo selección (para rutina)
+        </label>
+      </div>
+      <div id="exerciseGrid" class="exercise-grid"></div>
+      <p id="emptyState" class="empty-state" hidden>No se encontraron ejercicios con estos filtros.</p>
+    </section>
+  </section>
+
+  <!-- ===== VISTA: RUTINAS ===== -->
+  <section id="view-routines" class="view">
+    <div class="routines-header">
+      <h2>Mis rutinas</h2>
+      <button id="newRoutineBtn" class="btn primary">+ Nueva rutina</button>
+    </div>
+    <div class="filter-block routines-tag-filter">
+      <div class="chip-group" id="filterRoutineTags"></div>
+    </div>
+    <div id="routinesGrid" class="routines-grid"></div>
+    <p id="emptyRoutines" class="empty-state" hidden>Todavía no has creado ninguna rutina.</p>
+  </section>
+
+</main>
+
+<!-- ===== MODAL: DETALLE DE EJERCICIO ===== -->
+<div id="exerciseModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <button class="modal-close" data-close-modal>✕</button>
+    <div class="modal-body" id="exerciseModalBody"></div>
+  </div>
+</div>
+
+<!-- ===== MODAL: EDITAR / CREAR RUTINA ===== -->
+<div id="routineModal" class="modal-overlay" hidden>
+  <div class="modal modal-wide">
+    <button class="modal-close" data-close-modal>✕</button>
+    <div class="modal-body" id="routineModalBody"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="data/exercises.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
