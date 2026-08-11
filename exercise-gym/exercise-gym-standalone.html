@@ -1459,16 +1459,6 @@ window.EXERCISES_DATA = [{"id":"abductors/lever-seated-hip-abduction","slug":"le
     return new Uint8Array(out);
   }
 
-  function loadImageForCanvas(src) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("image load failed"));
-      img.src = src;
-    });
-  }
-
   function wrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight, maxLines) {
     const words = text.split(" ");
     const lines = [];
@@ -1485,72 +1475,292 @@ window.EXERCISES_DATA = [{"id":"abductors/lever-seated-hip-abduction","slug":"le
     }
     if (lines.length < maxLines && current) lines.push(current);
     lines.slice(0, maxLines).forEach((line, i) => ctx.fillText(line, cx, y + i * lineHeight));
+    return lines.length;
   }
 
-  const GIF_FRAME_W = 480;
-  const GIF_FRAME_H = 340;
-
-  async function renderExerciseFrame(exercise, routineTitle, index, total) {
-    const canvas = document.createElement("canvas");
-    canvas.width = GIF_FRAME_W;
-    canvas.height = GIF_FRAME_H;
-    const ctx = canvas.getContext("2d");
-
-    ctx.fillStyle = "#161923";
-    ctx.fillRect(0, 0, GIF_FRAME_W, GIF_FRAME_H);
-    ctx.fillStyle = "#7c5cff";
-    ctx.fillRect(0, 0, GIF_FRAME_W, 40);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 18px sans-serif";
-    ctx.textBaseline = "middle";
-    ctx.fillText(routineTitle, 14, 20, GIF_FRAME_W - 28);
-
-    const boxSize = 200;
-    const boxX = (GIF_FRAME_W - boxSize) / 2;
-    const boxY = 50;
-    let img = null;
-    const src = exercise.thumbUrl || exercise.gifUrl;
-    if (src) {
-      try { img = await loadImageForCanvas(src); } catch (err) { img = null; }
+  // ---------------------------------------------------------------------
+  // GIF decoder — parses a real animated GIF (from the exercise's own
+  // gifUrl) back into its individual frames, so the export can replay the
+  // actual exercise execution instead of a single static picture.
+  // ---------------------------------------------------------------------
+  function lzwDecodeGif(dataBytes, minCodeSize) {
+    const CLEAR = 1 << minCodeSize, EOI = CLEAR + 1;
+    let codeSize, dict;
+    function resetDict() {
+      dict = [];
+      for (let i = 0; i < CLEAR; i++) dict.push([i]);
+      dict.push(null);
+      dict.push(null);
+      codeSize = minCodeSize + 1;
     }
-    if (img) {
-      ctx.drawImage(img, boxX, boxY, boxSize, boxSize);
-    } else {
-      ctx.fillStyle = "#1d212e";
-      ctx.fillRect(boxX, boxY, boxSize, boxSize);
-      ctx.fillStyle = "#9aa1b2";
-      ctx.font = "13px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Sin imagen", GIF_FRAME_W / 2, boxY + boxSize / 2);
+    resetDict();
+    let bitBuffer = 0, bitCount = 0, pos = 0;
+    function readCode(size) {
+      while (bitCount < size) {
+        if (pos >= dataBytes.length) return -1;
+        bitBuffer |= dataBytes[pos++] << bitCount;
+        bitCount += 8;
+      }
+      const code = bitBuffer & ((1 << size) - 1);
+      bitBuffer >>>= size;
+      bitCount -= size;
+      return code;
+    }
+    const output = [];
+    let prev = null;
+    while (true) {
+      const code = readCode(codeSize);
+      if (code === -1 || code === EOI) break;
+      if (code === CLEAR) { resetDict(); prev = null; continue; }
+      let entry;
+      if (code < dict.length && dict[code]) entry = dict[code];
+      else if (code === dict.length && prev) entry = prev.concat([prev[0]]);
+      else break; // corrupt/truncated stream: stop instead of throwing
+      for (const b of entry) output.push(b);
+      if (prev) {
+        dict.push(prev.concat([entry[0]]));
+        if (dict.length === 1 << codeSize && codeSize < 12) codeSize++;
+      }
+      prev = entry;
+    }
+    return output;
+  }
+
+  function interlaceRowOrder(height) {
+    const order = [];
+    for (let y = 0; y < height; y += 8) order.push(y);
+    for (let y = 4; y < height; y += 8) order.push(y);
+    for (let y = 2; y < height; y += 4) order.push(y);
+    for (let y = 1; y < height; y += 2) order.push(y);
+    return order;
+  }
+
+  function decodeGifFile(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let pos = 0;
+    const readByte = () => bytes[pos++];
+    const readU16 = () => { const v = bytes[pos] | (bytes[pos + 1] << 8); pos += 2; return v; };
+
+    const sig = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
+    if (!sig.startsWith("GIF8")) throw new Error("not a gif");
+    pos = 6;
+    const width = readU16(), height = readU16();
+    const lsdPacked = readByte();
+    const gctFlag = (lsdPacked & 0x80) !== 0;
+    const gctSize = gctFlag ? 2 << (lsdPacked & 0x07) : 0;
+    readByte(); // background color index
+    readByte(); // pixel aspect ratio
+    let gct = null;
+    if (gctFlag) {
+      gct = [];
+      for (let i = 0; i < gctSize; i++) gct.push([readByte(), readByte(), readByte()]);
     }
 
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#eef0f4";
-    ctx.font = "bold 16px sans-serif";
-    ctx.textBaseline = "alphabetic";
-    wrapCenteredText(ctx, exercise.name, GIF_FRAME_W / 2, boxY + boxSize + 26, GIF_FRAME_W - 40, 20, 2);
+    const BG = [255, 255, 255]; // compose disposed/uncovered regions onto white, like paper
+    let canvasData = new Uint8ClampedArray(width * height * 4);
+    for (let i = 0; i < width * height; i++) { canvasData[i * 4] = BG[0]; canvasData[i * 4 + 1] = BG[1]; canvasData[i * 4 + 2] = BG[2]; canvasData[i * 4 + 3] = 255; }
 
-    ctx.fillStyle = "#5ce6c4";
-    ctx.font = "13px sans-serif";
-    const muscleLine = [label("bodyPart", exercise.bodyPart), label("muscle", exercise.muscle)].filter(Boolean).join(" · ");
-    ctx.fillText(muscleLine, GIF_FRAME_W / 2, GIF_FRAME_H - 34);
+    let gceDelay = 10, gceDisposal = 0, gceTransparent = false, gceTransparentIndex = -1;
+    const frames = [];
 
-    ctx.fillStyle = "#9aa1b2";
-    ctx.font = "12px sans-serif";
-    ctx.fillText(`${index + 1} / ${total}`, GIF_FRAME_W / 2, GIF_FRAME_H - 14);
+    while (pos < bytes.length) {
+      const blockType = readByte();
+      if (blockType === 0x21) {
+        const extLabel = readByte();
+        if (extLabel === 0xf9) {
+          readByte(); // block size (4)
+          const p = readByte();
+          gceDisposal = (p >> 2) & 0x07;
+          gceTransparent = (p & 0x01) !== 0;
+          gceDelay = readU16();
+          gceTransparentIndex = readByte();
+          readByte(); // terminator
+        } else {
+          let size = readByte();
+          while (size !== 0) { pos += size; size = readByte(); }
+        }
+      } else if (blockType === 0x2c) {
+        const left = readU16(), top = readU16(), w = readU16(), h = readU16();
+        const p = readByte();
+        const lctFlag = (p & 0x80) !== 0;
+        const interlace = (p & 0x40) !== 0;
+        const lctSize = lctFlag ? 2 << (p & 0x07) : 0;
+        let lct = null;
+        if (lctFlag) { lct = []; for (let i = 0; i < lctSize; i++) lct.push([readByte(), readByte(), readByte()]); }
+        const minCodeSize = readByte();
+        const dataBytes = [];
+        let size = readByte();
+        while (size !== 0) { for (let i = 0; i < size; i++) dataBytes.push(readByte()); size = readByte(); }
 
-    return ctx.getImageData(0, 0, GIF_FRAME_W, GIF_FRAME_H);
+        const flat = lzwDecodeGif(dataBytes, minCodeSize);
+        const indices = new Uint8Array(w * h);
+        for (let i = 0; i < Math.min(flat.length, w * h); i++) indices[i] = flat[i];
+        let rowOrder = null;
+        if (interlace) rowOrder = interlaceRowOrder(h);
+        const palette = lct || gct || [[0, 0, 0]];
+
+        let restoreSnapshot = null;
+        if (gceDisposal === 3) restoreSnapshot = canvasData.slice();
+
+        for (let sy = 0; sy < h; sy++) {
+          const destY = rowOrder ? rowOrder[sy] : sy;
+          for (let x = 0; x < w; x++) {
+            const idx = indices[sy * w + x];
+            if (gceTransparent && idx === gceTransparentIndex) continue;
+            const c = palette[idx] || [0, 0, 0];
+            const cx = left + x, cy = top + destY;
+            if (cx < 0 || cy < 0 || cx >= width || cy >= height) continue;
+            const o = (cy * width + cx) * 4;
+            canvasData[o] = c[0]; canvasData[o + 1] = c[1]; canvasData[o + 2] = c[2]; canvasData[o + 3] = 255;
+          }
+        }
+
+        frames.push({ data: canvasData.slice(), delay: Math.max(gceDelay * 10, 20) });
+
+        if (gceDisposal === 2) {
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const cx = left + x, cy = top + y;
+              if (cx < 0 || cy < 0 || cx >= width || cy >= height) continue;
+              const o = (cy * width + cx) * 4;
+              canvasData[o] = BG[0]; canvasData[o + 1] = BG[1]; canvasData[o + 2] = BG[2]; canvasData[o + 3] = 255;
+            }
+          }
+        } else if (gceDisposal === 3 && restoreSnapshot) {
+          canvasData = restoreSnapshot;
+        }
+
+        gceDelay = 10; gceDisposal = 0; gceTransparent = false; gceTransparentIndex = -1;
+      } else if (blockType === 0x3b || Number.isNaN(blockType)) {
+        break;
+      } else {
+        break; // unrecognized block: stop rather than risk reading garbage
+      }
+    }
+
+    if (!frames.length) throw new Error("no frames decoded");
+    return { width, height, frames };
+  }
+
+  async function fetchGifBytes(url) {
+    const resp = await fetch(url, { mode: "cors" });
+    if (!resp.ok) throw new Error("fetch failed: " + resp.status);
+    return resp.arrayBuffer();
+  }
+
+  // ---------------------------------------------------------------------
+  // Routine GIF export — an A4-proportioned sheet with every exercise's
+  // own real animation looping in its cell.
+  // ---------------------------------------------------------------------
+  const A4_CANVAS_W = 720;
+  const A4_CANVAS_H = 1020; // ~ A4 portrait ratio (1 : 1.414)
+  const A4_HEADER_H = 60;
+  const A4_MARGIN = 14;
+  const GIF_MASTER_DELAY_MS = 100;
+  const GIF_MASTER_DURATION_MS = 3000;
+
+  async function decodeExerciseGif(exercise) {
+    if (!exercise.gifUrl) return null;
+    try {
+      const buf = await fetchGifBytes(exercise.gifUrl);
+      return decodeGifFile(buf);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function pickSourceFrame(gif, elapsedMs) {
+    const total = gif.frames.reduce((s, f) => s + f.delay, 0) || 1;
+    const t = elapsedMs % total;
+    let acc = 0;
+    for (const f of gif.frames) {
+      acc += f.delay;
+      if (t < acc) return f;
+    }
+    return gif.frames[gif.frames.length - 1];
   }
 
   async function exportRoutineAsGif(routine) {
     const exs = routine.exerciseIds.map((id) => BY_ID.get(id)).filter(Boolean);
     if (!exs.length) { showToast("La rutina no tiene ejercicios"); return; }
+
+    const decoded = await Promise.all(exs.map(async (ex) => ({ ex, gif: await decodeExerciseGif(ex) })));
+
+    const columns = exs.length <= 2 ? 1 : exs.length <= 6 ? 2 : 3;
+    const rows = Math.ceil(exs.length / columns);
+    const gridW = A4_CANVAS_W - A4_MARGIN * 2;
+    const gridH = A4_CANVAS_H - A4_HEADER_H - A4_MARGIN * 2;
+    const cellW = gridW / columns;
+    const cellH = gridH / rows;
+    const imgSize = Math.max(24, Math.min(cellW - 12, cellH - 56));
+
+    // One reusable offscreen canvas per exercise at the gif's native size,
+    // so each master frame only needs a cheap scaled drawImage into place.
+    const sourceCanvases = decoded.map(({ gif }) => {
+      if (!gif) return null;
+      const c = document.createElement("canvas");
+      c.width = gif.width;
+      c.height = gif.height;
+      return { canvas: c, ctx: c.getContext("2d") };
+    });
+
+    const masterFrameCount = Math.round(GIF_MASTER_DURATION_MS / GIF_MASTER_DELAY_MS);
+    const composite = document.createElement("canvas");
+    composite.width = A4_CANVAS_W;
+    composite.height = A4_CANVAS_H;
+    const ctx = composite.getContext("2d");
+
     const frames = [];
-    for (let i = 0; i < exs.length; i++) {
-      const imageData = await renderExerciseFrame(exs[i], routine.title, i, exs.length);
-      frames.push(quantizeFrame(imageData));
+    for (let f = 0; f < masterFrameCount; f++) {
+      // These colors are deliberately exact multiples of 51 (0/51/102/153/204/255)
+      // so GIF_PALETTE's fixed 6x6x6 color cube renders them with zero rounding
+      // error — an arbitrary color like #e6e2d3 can round to a completely
+      // different hue (e.g. pink) once each channel snaps to its nearest level.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, A4_CANVAS_W, A4_CANVAS_H);
+      ctx.fillStyle = "#6633ff";
+      ctx.fillRect(0, 0, A4_CANVAS_W, A4_HEADER_H);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 20px sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      ctx.fillText(routine.title, 14, A4_HEADER_H / 2, A4_CANVAS_W - 28);
+
+      decoded.forEach(({ ex, gif }, i) => {
+        const col = i % columns, row = Math.floor(i / columns);
+        const cellX = A4_MARGIN + col * cellW;
+        const cellY = A4_HEADER_H + A4_MARGIN + row * cellH;
+        const imgX = cellX + (cellW - imgSize) / 2;
+        const imgY = cellY + 4;
+
+        if (gif && sourceCanvases[i]) {
+          const frame = pickSourceFrame(gif, f * GIF_MASTER_DELAY_MS);
+          const off = sourceCanvases[i];
+          off.ctx.putImageData(new ImageData(frame.data, gif.width, gif.height), 0, 0);
+          ctx.drawImage(off.canvas, imgX, imgY, imgSize, imgSize);
+        } else {
+          ctx.fillStyle = "#cccccc";
+          ctx.fillRect(imgX, imgY, imgSize, imgSize);
+          ctx.fillStyle = "#666666";
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Sin animación", imgX + imgSize / 2, imgY + imgSize / 2);
+        }
+
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#000000";
+        ctx.font = "bold 12px sans-serif";
+        const nameLines = wrapCenteredText(ctx, ex.name, cellX + cellW / 2, imgY + imgSize + 14, cellW - 10, 13, 2);
+        ctx.fillStyle = "#336666";
+        ctx.font = "10px sans-serif";
+        const muscleLine = [label("bodyPart", ex.bodyPart), label("muscle", ex.muscle)].filter(Boolean).join(" · ");
+        ctx.fillText(muscleLine, cellX + cellW / 2, imgY + imgSize + 14 + nameLines * 13 + 3, cellW - 10);
+      });
+
+      frames.push(quantizeFrame(ctx.getImageData(0, 0, A4_CANVAS_W, A4_CANVAS_H)));
     }
-    const gifBytes = buildGif(frames, GIF_FRAME_W, GIF_FRAME_H, GIF_PALETTE, 150);
+
+    const gifBytes = buildGif(frames, A4_CANVAS_W, A4_CANVAS_H, GIF_PALETTE, GIF_MASTER_DELAY_MS / 10);
     const blob = new Blob([gifBytes], { type: "image/gif" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
